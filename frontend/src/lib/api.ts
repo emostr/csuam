@@ -7,6 +7,10 @@ export class ApiError extends Error {
   }
 }
 
+export function errorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : 'Неизвестная ошибка'
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch('/api' + path, { credentials: 'include', ...options })
   const ct = res.headers.get('content-type') || ''
