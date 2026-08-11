@@ -10,7 +10,7 @@
 - Бэкенд: Go + Chi + sqlc (pgx)
 - СУБД: PostgreSQL
 - Хранилище файлов: S3-совместимое (MinIO)
-- Сервер: Debian 13 Trixie, NGINX, Docker
+- Сервер: NGINX, Docker
 
 ## Возможности
 
