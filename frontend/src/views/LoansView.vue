@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import NPageHeader from '@/components/ui/NPageHeader.vue'
@@ -11,28 +11,30 @@ import NInput from '@/components/ui/NInput.vue'
 import NTextarea from '@/components/ui/NTextarea.vue'
 import NSelect from '@/components/ui/NSelect.vue'
 import NDateInput from '@/components/ui/NDateInput.vue'
-import { api } from '@/lib/api'
+import { api, errorMessage } from '@/lib/api'
 import { notify } from '@/lib/notify'
 import { formatDate, formatDateTime, isOverdue } from '@/lib/catalog'
+import type { Loan, Material } from '@/lib/types'
+import type { SelectOption, TabItem, TableColumn } from '@/lib/ui'
 
 const router = useRouter()
 
-const tab = ref('active')
-const loans = ref([])
+const tab = ref<string | number>('active')
+const loans = ref<Loan[]>([])
 const loading = ref(true)
 
 const addOpen = ref(false)
-const books = ref([])
+const books = ref<Material[]>([])
 const newLoan = ref({ material_id: '', borrower_name: '', due_date: '', note: '' })
 const saving = ref(false)
 
-const tabs = computed(() => [
+const tabs = computed<TabItem[]>(() => [
   { value: 'active', label: 'Активные', icon: 'clock' },
   { value: 'archive', label: 'Архив', icon: 'archive' },
 ])
 
-const columns = computed(() => {
-  const cols = [
+const columns = computed<TableColumn[]>(() => {
+  const cols: TableColumn[] = [
     { key: 'material_title', label: 'Предмет' },
     { key: 'borrower_name', label: 'Кто взял' },
     { key: 'taken_at', label: 'Взято' },
@@ -51,9 +53,9 @@ const overdueCount = computed(() => loans.value.filter(isOverdue).length)
 async function load() {
   loading.value = true
   try {
-    loans.value = await api.get('/loans' + (tab.value === 'archive' ? '?archive=1' : ''))
+    loans.value = await api.get<Loan[]>('/loans' + (tab.value === 'archive' ? '?archive=1' : ''))
   } catch (e) {
-    notify.error('Не удалось загрузить прокат', { text: e.message })
+    notify.error('Не удалось загрузить прокат', { text: errorMessage(e) })
   } finally {
     loading.value = false
   }
@@ -77,12 +79,12 @@ async function openAdd() {
   addOpen.value = true
   if (!books.value.length) {
     try {
-      books.value = await api.get('/materials?category=library')
+      books.value = await api.get<Material[]>('/materials?category=library')
     } catch {}
   }
 }
 
-const bookOptions = computed(() =>
+const bookOptions = computed<SelectOption[]>(() =>
   books.value.map((b) => ({ value: String(b.id), label: b.title })),
 )
 
@@ -104,13 +106,13 @@ async function createLoan() {
     tab.value = 'active'
     load()
   } catch (e) {
-    notify.error('Не удалось добавить запись', { text: e.message })
+    notify.error('Не удалось добавить запись', { text: errorMessage(e) })
   } finally {
     saving.value = false
   }
 }
 
-async function markReturned(loan) {
+async function markReturned(loan: Loan) {
   const ok = await notify.confirm({
     title: 'Предмет возвращён?',
     text: `«${loan.material_title}» — ${loan.borrower_name}. Запись будет перенесена в архив.`,
@@ -123,7 +125,7 @@ async function markReturned(loan) {
     notify.success('Возврат отмечен')
     load()
   } catch (e) {
-    notify.error('Не удалось отметить возврат', { text: e.message })
+    notify.error('Не удалось отметить возврат', { text: errorMessage(e) })
   }
 }
 </script>
@@ -149,17 +151,17 @@ async function markReturned(loan) {
         </button>
         <div v-if="row.note" class="text-xs text-muted mt-0.5">{{ row.note }}</div>
       </template>
-      <template #taken_at="{ value }">
-        <span class="text-muted">{{ formatDate(value) }}</span>
+      <template #taken_at="{ row }">
+        <span class="text-muted">{{ formatDate(row.taken_at) }}</span>
       </template>
-      <template #due_date="{ row, value }">
+      <template #due_date="{ row }">
         <div class="flex items-center gap-2">
-          <span :class="isOverdue(row) ? 'text-danger font-bold' : ''">{{ formatDate(value) }}</span>
+          <span :class="isOverdue(row) ? 'text-danger font-bold' : ''">{{ formatDate(row.due_date) }}</span>
           <NBadge v-if="isOverdue(row)" variant="danger" dot>Просрочено</NBadge>
         </div>
       </template>
-      <template #returned_at="{ value }">
-        <span class="text-muted">{{ formatDateTime(value) }}</span>
+      <template #returned_at="{ row }">
+        <span class="text-muted">{{ formatDateTime(row.returned_at) }}</span>
       </template>
       <template #actions="{ row }">
         <NButton size="sm" variant="secondary" icon="check" @click="markReturned(row)">

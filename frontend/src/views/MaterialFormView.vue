@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import NPageHeader from '@/components/ui/NPageHeader.vue'
@@ -11,39 +11,62 @@ import NDateInput from '@/components/ui/NDateInput.vue'
 import NAlert from '@/components/ui/NAlert.vue'
 import NIcon from '@/components/ui/NIcon.vue'
 import TextEditor from '@/components/TextEditor.vue'
-import { api } from '@/lib/api'
+import { api, errorMessage } from '@/lib/api'
 import { notify } from '@/lib/notify'
 import { user } from '@/lib/auth'
 import { CATEGORIES, formatBytes } from '@/lib/catalog'
+import type { ContentFormat, Material, MaterialCategory } from '@/lib/types'
+import type { SelectOption } from '@/lib/ui'
 
 const route = useRoute()
 const router = useRouter()
 
-const editId = computed(() => route.params.id || null)
+const editId = computed<string | null>(() => {
+  const id = route.params.id
+  return typeof id === 'string' && id ? id : null
+})
 const isEdit = computed(() => !!editId.value)
 
 const ACCEPT =
   '.pdf,.doc,.docx,.ppt,.pptx,.odt,.odp,.png,.jpg,.jpeg,.gif,.svg,.bmp,.webp,.mp4,.mp3,.wav,.wmv,.webm,.html,.md'
 
-const form = ref({
+interface MaterialForm {
+  title: string
+  category: MaterialCategory
+  description: string
+  condition: string
+  location: string
+  origin_date: string
+}
+
+function queryCategory(v: unknown): MaterialCategory {
+  return CATEGORIES.find((c) => c.id === v)?.id ?? 'photos'
+}
+
+const form = ref<MaterialForm>({
   title: '',
-  category: route.query.category || 'photos',
+  category: queryCategory(route.query.category),
   description: '',
   condition: '',
   location: '',
   origin_date: '',
 })
 
-const sourceType = ref('file')
-const file = ref(null)
-const fileInput = ref(null)
+interface ExistingFile {
+  name: string
+  size: number | null
+}
+
+const sourceType = ref<'file' | 'text' | 'existing'>('file')
+const file = ref<File | ExistingFile | null>(null)
+const fileInput = ref<HTMLInputElement | null>(null)
 const dragOver = ref(false)
 const content = ref('')
-const contentFormat = ref('html')
+const contentFormat = ref<ContentFormat>('html')
 const saving = ref(false)
 const loaded = ref(false)
 
-const categoryOptions = computed(() =>
+const categoryOptions = computed<SelectOption[]>(() =>
   CATEGORIES.filter((c) => c.id !== 'documents' || user.value?.role === 'head_teacher').map(
     (c) => ({ value: c.id, label: c.label }),
   ),
@@ -60,7 +83,7 @@ onMounted(async () => {
     return
   }
   try {
-    const m = await api.get(`/materials/${editId.value}`)
+    const m = await api.get<Material>(`/materials/${editId.value}`)
     form.value = {
       title: m.title,
       category: m.category,
@@ -79,7 +102,7 @@ onMounted(async () => {
     }
     loaded.value = true
   } catch (e) {
-    notify.error('Не удалось загрузить материал', { text: e.message })
+    notify.error('Не удалось загрузить материал', { text: errorMessage(e) })
     router.back()
   }
 })
@@ -88,7 +111,7 @@ function pickFile() {
   fileInput.value?.click()
 }
 
-function validateFile(f) {
+function validateFile(f: File): boolean {
   const ext = '.' + (f.name.split('.').pop() || '').toLowerCase()
   if (!ACCEPT.split(',').includes(ext)) {
     notify.error('Формат не поддерживается', {
@@ -99,13 +122,14 @@ function validateFile(f) {
   return true
 }
 
-function onFileChange(e) {
-  const f = e.target.files?.[0]
-  e.target.value = ''
+function onFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  const f = input.files?.[0]
+  input.value = ''
   if (f && validateFile(f)) file.value = f
 }
 
-function onDrop(e) {
+function onDrop(e: DragEvent) {
   dragOver.value = false
   const f = e.dataTransfer?.files?.[0]
   if (f && validateFile(f)) file.value = f
@@ -118,17 +142,17 @@ async function submit() {
   }
   saving.value = true
   try {
-    let m
+    let m: Material
     if (isEdit.value) {
-      const body = { ...form.value }
+      const body: Record<string, string> = { ...form.value }
       if (sourceType.value === 'text') {
         body.content = content.value
         body.content_format = contentFormat.value
       }
-      m = await api.put(`/materials/${editId.value}`, body)
+      m = await api.put<Material>(`/materials/${editId.value}`, body)
       notify.success('Изменения сохранены')
     } else if (sourceType.value === 'text') {
-      m = await api.post('/materials', {
+      m = await api.post<Material>('/materials', {
         ...form.value,
         content: content.value,
         content_format: contentFormat.value,
@@ -138,12 +162,12 @@ async function submit() {
       const fd = new FormData()
       for (const [k, v] of Object.entries(form.value)) fd.append(k, v ?? '')
       if (file.value instanceof File) fd.append('file', file.value)
-      m = await api.postForm('/materials', fd)
+      m = await api.postForm<Material>('/materials', fd)
       notify.success(isTeacher.value ? 'Отправлено на модерацию' : 'Экспонат добавлен')
     }
     router.push(`/material/${m.id}`)
   } catch (e) {
-    notify.error('Не удалось сохранить', { text: e.message })
+    notify.error('Не удалось сохранить', { text: errorMessage(e) })
   } finally {
     saving.value = false
   }

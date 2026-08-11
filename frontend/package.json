@@ -6,9 +6,10 @@
   "description": "csuam front",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc --noEmit && vite build",
+    "build": "node scripts/vue-tsc5.mjs --noEmit && vite build",
     "preview": "vite preview",
-    "type-check": "vue-tsc --noEmit"
+    "type-check": "node scripts/vue-tsc5.mjs --noEmit",
+    "type-check:node": "tsc -p tsconfig.node.json"
   },
   "dependencies": {
     "chart.js": "^4.4.7",
@@ -21,7 +22,8 @@
     "@types/node": "^26.2.0",
     "@vitejs/plugin-vue": "^5.2.1",
     "tailwindcss": "^4.3.3",
-    "typescript": "~5.9.0",
+    "typescript": "^7.0.2",
+    "typescript-5": "npm:typescript@~5.9.0",
     "vite": "^6.0.7",
     "vue-tsc": "^3.3.9"
   }

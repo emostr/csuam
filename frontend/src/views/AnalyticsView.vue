@@ -1,28 +1,29 @@
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { Chart, registerables } from 'chart.js'
 import NPageHeader from '@/components/ui/NPageHeader.vue'
 import NCard from '@/components/ui/NCard.vue'
 import NTile from '@/components/ui/NTile.vue'
-import { api } from '@/lib/api'
+import { api, errorMessage } from '@/lib/api'
 import { notify } from '@/lib/notify'
 import { theme, accent } from '@/lib/theme'
 import { isModerator } from '@/lib/auth'
 import { CATEGORIES, categoryMeta } from '@/lib/catalog'
+import type { AnalyticsSummary, MaterialCategory } from '@/lib/types'
 
 Chart.register(...registerables)
 
-const summary = ref(null)
-const doughnutCanvas = ref(null)
-const barCanvas = ref(null)
-let doughnutChart = null
-let barChart = null
+const summary = ref<AnalyticsSummary | null>(null)
+const doughnutCanvas = ref<HTMLCanvasElement | null>(null)
+const barCanvas = ref<HTMLCanvasElement | null>(null)
+let doughnutChart: Chart<'doughnut'> | null = null
+let barChart: Chart<'bar'> | null = null
 
-function cssVar(name) {
+function cssVar(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 }
 
-function monthLabel(ym) {
+function monthLabel(ym: string): string {
   const [y, m] = ym.split('-')
   const names = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
   return `${names[Number(m) - 1]} ${y.slice(2)}`
@@ -30,11 +31,12 @@ function monthLabel(ym) {
 
 function buildCharts() {
   if (!summary.value || !doughnutCanvas.value || !barCanvas.value) return
+  const s = summary.value
   const muted = cssVar('--ng-muted')
   const line = cssVar('--ng-line')
   const accentColor = cssVar('--ng-accent')
 
-  const catColors = {
+  const catColors: Record<MaterialCategory, string> = {
     photos: cssVar('--ng-info'),
     videos: cssVar('--ng-warning'),
     library: accentColor,
@@ -45,7 +47,7 @@ function buildCharts() {
   const byCat = CATEGORIES.map((c) => ({
     label: c.label,
     id: c.id,
-    count: summary.value.by_category.find((x) => x.category === c.id)?.count || 0,
+    count: s.by_category.find((x) => x.category === c.id)?.count || 0,
   }))
 
   doughnutChart?.destroy()
@@ -75,7 +77,7 @@ function buildCharts() {
     },
   })
 
-  const monthly = summary.value.monthly
+  const monthly = s.monthly
   barChart?.destroy()
   barChart = new Chart(barCanvas.value, {
     type: 'bar',
@@ -108,10 +110,11 @@ function buildCharts() {
 
 onMounted(async () => {
   try {
-    summary.value = await api.get('/analytics/summary')
+    summary.value = await api.get<AnalyticsSummary>('/analytics/summary')
     requestAnimationFrame(buildCharts)
   } catch (e) {
-    notify.error('Не удалось загрузить аналитику', { text: e.message })  }
+    notify.error('Не удалось загрузить аналитику', { text: errorMessage(e) })
+  }
 })
 
 watch([theme, accent], () => requestAnimationFrame(buildCharts))
@@ -121,7 +124,7 @@ onBeforeUnmount(() => {
   barChart?.destroy()
 })
 
-function catCount(id) {
+function catCount(id: MaterialCategory): number {
   return summary.value?.by_category.find((x) => x.category === id)?.count || 0
 }
 </script>

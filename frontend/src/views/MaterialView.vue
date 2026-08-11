@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import NPageHeader from '@/components/ui/NPageHeader.vue'
@@ -9,7 +9,7 @@ import NModal from '@/components/ui/NModal.vue'
 import NSelect from '@/components/ui/NSelect.vue'
 import NIcon from '@/components/ui/NIcon.vue'
 import MaterialViewer from '@/components/MaterialViewer.vue'
-import { api } from '@/lib/api'
+import { api, errorMessage } from '@/lib/api'
 import { notify } from '@/lib/notify'
 import { user, isModerator, isHeadTeacher } from '@/lib/auth'
 import {
@@ -21,21 +21,23 @@ import {
   formatDateTime,
   formatBytes,
 } from '@/lib/catalog'
+import type { Material, Permission, User } from '@/lib/types'
+import type { SelectOption } from '@/lib/ui'
 
 const route = useRoute()
 const router = useRouter()
 
-const material = ref(null)
+const material = ref<Material | null>(null)
 const error = ref('')
 const qrOpen = ref(false)
 const exportOpen = ref(false)
 
-const permissions = ref([])
-const users = ref([])
+const permissions = ref<Permission[]>([])
+const users = ref<User[]>([])
 const grantUserId = ref('')
 
-const id = computed(() => route.params.id)
-const meta = computed(() => (material.value ? categoryMeta(material.value.category) : null))
+const id = computed(() => String(route.params.id))
+const meta = computed(() => categoryMeta(material.value?.category ?? 'photos'))
 const fileUrl = computed(() => `/api/materials/${id.value}/file`)
 const qrUrl = computed(() => `/api/materials/${id.value}/qr`)
 
@@ -46,21 +48,21 @@ const canManage = computed(() => {
   return material.value.created_by === user.value.id
 })
 
-const userOptions = computed(() =>
+const userOptions = computed<SelectOption[]>(() =>
   users.value
     .filter((u) => u.id !== user.value?.id && !permissions.value.some((p) => p.user_id === u.id))
-    .map((u) => ({ value: String(u.id), label: `${u.full_name} (${ROLE_LABELS[u.role] || u.role})` })),
+    .map((u) => ({ value: String(u.id), label: `${u.full_name} (${ROLE_LABELS[u.role]})` })),
 )
 
 async function load() {
   try {
-    material.value = await api.get(`/materials/${id.value}`)
+    material.value = await api.get<Material>(`/materials/${id.value}`)
     if (isHeadTeacher.value) {
-      permissions.value = await api.get(`/materials/${id.value}/permissions`)
-      users.value = await api.get('/users')
+      permissions.value = await api.get<Permission[]>(`/materials/${id.value}/permissions`)
+      users.value = await api.get<User[]>('/users')
     }
   } catch (e) {
-    error.value = e.message
+    error.value = errorMessage(e)
   }
 }
 
@@ -70,18 +72,18 @@ function download() {
   window.open(fileUrl.value + '?download=1', '_blank')
 }
 
-function exportCard(format) {
+function exportCard(format: 'json' | 'xml') {
   exportOpen.value = false
   window.open(`/api/materials/${id.value}/export?format=${format}`, '_blank')
 }
 
-async function moderate(action) {
+async function moderate(action: 'approve' | 'reject') {
   const verb = action === 'approve' ? 'принят' : 'отклонён'
   try {
-    material.value = await api.post(`/materials/${id.value}/${action}`)
+    material.value = await api.post<Material>(`/materials/${id.value}/${action}`)
     notify.success(`Материал ${verb}`)
   } catch (e) {
-    notify.error('Не удалось изменить статус', { text: e.message })
+    notify.error('Не удалось изменить статус', { text: errorMessage(e) })
   }
 }
 
@@ -98,7 +100,7 @@ async function remove() {
     notify.success('Экспонат удалён')
     router.push('/')
   } catch (e) {
-    notify.error('Не удалось удалить', { text: e.message })
+    notify.error('Не удалось удалить', { text: errorMessage(e) })
   }
 }
 
@@ -107,14 +109,14 @@ async function grant() {
   try {
     await api.post(`/materials/${id.value}/permissions`, { user_id: Number(grantUserId.value) })
     grantUserId.value = ''
-    permissions.value = await api.get(`/materials/${id.value}/permissions`)
+    permissions.value = await api.get<Permission[]>(`/materials/${id.value}/permissions`)
     notify.success('Доступ выдан')
   } catch (e) {
-    notify.error('Не удалось выдать доступ', { text: e.message })
+    notify.error('Не удалось выдать доступ', { text: errorMessage(e) })
   }
 }
 
-async function revoke(p) {
+async function revoke(p: Permission) {
   const ok = await notify.confirm({
     title: 'Отозвать доступ?',
     text: `${p.full_name} больше не сможет просматривать этот материал`,
@@ -127,7 +129,7 @@ async function revoke(p) {
     permissions.value = permissions.value.filter((x) => x.user_id !== p.user_id)
     notify.success('Доступ отозван')
   } catch (e) {
-    notify.error('Не удалось отозвать доступ', { text: e.message })
+    notify.error('Не удалось отозвать доступ', { text: errorMessage(e) })
   }
 }
 

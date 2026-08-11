@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import NPageHeader from '@/components/ui/NPageHeader.vue'
@@ -9,21 +9,24 @@ import NDateInput from '@/components/ui/NDateInput.vue'
 import NTile from '@/components/ui/NTile.vue'
 import NAlert from '@/components/ui/NAlert.vue'
 import MaterialCard from '@/components/MaterialCard.vue'
-import { api } from '@/lib/api'
+import { api, errorMessage } from '@/lib/api'
 import { notify } from '@/lib/notify'
 import { user, isModerator } from '@/lib/auth'
 import { CATEGORIES } from '@/lib/catalog'
+import type { AnalyticsSummary, Material, Notifications } from '@/lib/types'
 
 const route = useRoute()
 const router = useRouter()
 
-const materials = ref([])
-const loading = ref(true)
-const summary = ref(null)
+const queryString = (v: unknown): string => (typeof v === 'string' ? v : '')
 
-const q = ref(route.query.q || '')
-const category = ref(route.query.category || '')
-const status = ref(route.query.status || '')
+const materials = ref<Material[]>([])
+const loading = ref(true)
+const summary = ref<AnalyticsSummary | null>(null)
+
+const q = ref(queryString(route.query.q))
+const category = ref(queryString(route.query.category))
+const status = ref(queryString(route.query.status))
 const from = ref('')
 const to = ref('')
 
@@ -38,7 +41,7 @@ const statusOptions = [
   { value: 'rejected', label: 'Отклонённые' },
 ]
 
-const importInput = ref(null)
+const importInput = ref<HTMLInputElement | null>(null)
 
 async function load() {
   loading.value = true
@@ -49,9 +52,9 @@ async function load() {
     if (status.value) params.set('status', status.value)
     if (from.value) params.set('from', from.value)
     if (to.value) params.set('to', to.value)
-    materials.value = await api.get('/materials?' + params.toString())
+    materials.value = await api.get<Material[]>('/materials?' + params.toString())
   } catch (e) {
-    notify.error('Не удалось загрузить материалы', { text: e.message })
+    notify.error('Не удалось загрузить материалы', { text: errorMessage(e) })
   } finally {
     loading.value = false
   }
@@ -66,16 +69,16 @@ watch(
   () => route.query,
   async (nq) => {
     syncing = true
-    q.value = nq.q || ''
-    status.value = nq.status || ''
+    q.value = queryString(nq.q)
+    status.value = queryString(nq.status)
     await nextTick()
     syncing = false
     load()
   },
 )
 
-const counts = computed(() => {
-  const map = {}
+const counts = computed<Partial<Record<string, number>>>(() => {
+  const map: Partial<Record<string, number>> = {}
   for (const c of summary.value?.by_category || []) map[c.category] = c.count
   return map
 })
@@ -83,11 +86,11 @@ const counts = computed(() => {
 onMounted(async () => {
   load()
   try {
-    summary.value = await api.get('/analytics/summary')
+    summary.value = await api.get<AnalyticsSummary>('/analytics/summary')
   } catch {}
   if (isModerator.value && !sessionStorage.getItem('csuam-overdue-warned')) {
     try {
-      const n = await api.get('/notifications')
+      const n = await api.get<Notifications>('/notifications')
       if (n.overdue_loans > 0) {
         sessionStorage.setItem('csuam-overdue-warned', '1')
         notify.warning('Просрочен возврат книг', {
@@ -103,18 +106,19 @@ function startImport() {
   importInput.value?.click()
 }
 
-async function onImportFile(e) {
-  const file = e.target.files?.[0]
-  e.target.value = ''
+async function onImportFile(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
   if (!file) return
   const fd = new FormData()
   fd.append('file', file)
   try {
-    const m = await api.postForm('/materials/import', fd)
+    const m = await api.postForm<Material>('/materials/import', fd)
     notify.success('Карточка импортирована')
     router.push(`/material/${m.id}`)
   } catch (err) {
-    notify.error('Импорт не удался', { text: err.message })
+    notify.error('Импорт не удался', { text: errorMessage(err) })
   }
 }
 </script>

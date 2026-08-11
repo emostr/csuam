@@ -2,12 +2,7 @@
 import { computed } from 'vue'
 import NIcon from './NIcon.vue'
 
-export interface TabItem {
-  value: string | number
-  label: string
-  icon?: string
-  badge?: string | number | null
-}
+import type { TabItem } from '@/lib/ui'
 
 const props = withDefaults(
   defineProps<{

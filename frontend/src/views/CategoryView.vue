@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import NPageHeader from '@/components/ui/NPageHeader.vue'
@@ -6,18 +6,18 @@ import NButton from '@/components/ui/NButton.vue'
 import NInput from '@/components/ui/NInput.vue'
 import NDateInput from '@/components/ui/NDateInput.vue'
 import MaterialCard from '@/components/MaterialCard.vue'
-import { api } from '@/lib/api'
+import { api, errorMessage } from '@/lib/api'
 import { notify } from '@/lib/notify'
 import { isHeadTeacher } from '@/lib/auth'
 import { categoryMeta } from '@/lib/catalog'
+import type { Material, MaterialCategory } from '@/lib/types'
 
 const route = useRoute()
 const router = useRouter()
 
-const category = computed(() => route.meta.category)
+const category = computed<MaterialCategory>(() => route.meta.category ?? 'photos')
 const meta = computed(() => categoryMeta(category.value))
-// подзаголовки убраны
-const subtitles = {
+const subtitles: Record<MaterialCategory, string> = {
   photos: '',
   videos: '',
   library: '',
@@ -27,7 +27,7 @@ const subtitles = {
 
 const canAdd = computed(() => category.value !== 'documents' || isHeadTeacher.value)
 
-const materials = ref([])
+const materials = ref<Material[]>([])
 const loading = ref(true)
 const q = ref('')
 const from = ref('')
@@ -40,9 +40,9 @@ async function load() {
     if (q.value) params.set('q', q.value)
     if (from.value) params.set('from', from.value)
     if (to.value) params.set('to', to.value)
-    materials.value = await api.get('/materials?' + params.toString())
+    materials.value = await api.get<Material[]>('/materials?' + params.toString())
   } catch (e) {
-    notify.error('Не удалось загрузить материалы', { text: e.message })
+    notify.error('Не удалось загрузить материалы', { text: errorMessage(e) })
   } finally {
     loading.value = false
   }

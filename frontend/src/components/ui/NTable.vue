@@ -1,10 +1,5 @@
 <script setup lang="ts" generic="T extends object">
-export interface TableColumn {
-  key: string
-  label: string
-  align?: 'left' | 'right' | 'center'
-  width?: string
-}
+import type { TableColumn } from '@/lib/ui'
 
 withDefaults(
   defineProps<{

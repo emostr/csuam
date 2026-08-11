@@ -2,10 +2,7 @@
 import { computed, useId } from 'vue'
 import NIcon from './NIcon.vue'
 
-export interface SelectOption {
-  value: string | number
-  label: string
-}
+import type { SelectOption } from '@/lib/ui'
 
 const props = withDefaults(
   defineProps<{

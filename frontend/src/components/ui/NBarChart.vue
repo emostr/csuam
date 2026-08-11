@@ -1,11 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-export interface BarPoint {
-  label: string
-  value: number
-  active?: boolean
-}
+import type { BarPoint } from '@/lib/ui'
 
 const props = withDefaults(
   defineProps<{

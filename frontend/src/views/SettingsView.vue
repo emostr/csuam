@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref } from 'vue'
 import { theme, toggleTheme, accent, setAccent, ACCENTS } from '@/lib/theme'
 import NPageHeader from '@/components/ui/NPageHeader.vue'
@@ -9,10 +9,11 @@ import NAvatar from '@/components/ui/NAvatar.vue'
 import NBadge from '@/components/ui/NBadge.vue'
 import NInput from '@/components/ui/NInput.vue'
 import NButton from '@/components/ui/NButton.vue'
-import { api } from '@/lib/api'
+import { api, errorMessage } from '@/lib/api'
 import { notify } from '@/lib/notify'
 import { user } from '@/lib/auth'
 import { ROLE_LABELS, formatDate } from '@/lib/catalog'
+import type { UserRole } from '@/lib/types'
 
 const tab = ref('appearance')
 const tabs = [
@@ -45,13 +46,13 @@ async function changePassword() {
     pw.value = { current: '', next: '', repeat: '' }
     notify.success('Пароль изменён')
   } catch (e) {
-    notify.error('Не удалось сменить пароль', { text: e.message })
+    notify.error('Не удалось сменить пароль', { text: errorMessage(e) })
   } finally {
     pwSaving.value = false
   }
 }
 
-const roleHints = {
+const roleHints: Record<UserRole, string> = {
   head_teacher: 'Полный доступ',
   librarian: 'Частичный доступ',
   teacher: 'Частичный доступ',
@@ -116,7 +117,7 @@ const roleHints = {
           <div>
             <div class="font-bold text-ink">{{ user?.full_name }}</div>
             <div class="text-xs text-muted mt-0.5">@{{ user?.username }}</div>
-            <NBadge variant="accent" class="mt-2">{{ ROLE_LABELS[user?.role] || user?.role }}</NBadge>
+            <NBadge variant="accent" class="mt-2">{{ user ? ROLE_LABELS[user.role] : '' }}</NBadge>
           </div>
         </div>
       </NCard>
@@ -129,14 +130,14 @@ const roleHints = {
           </div>
           <div class="flex justify-between gap-4 py-2.5">
             <dt class="text-muted">Роль</dt>
-            <dd class="text-ink font-semibold">{{ ROLE_LABELS[user?.role] || user?.role }}</dd>
+            <dd class="text-ink font-semibold">{{ user ? ROLE_LABELS[user.role] : '' }}</dd>
           </div>
           <div class="flex justify-between gap-4 py-2.5">
             <dt class="text-muted">В системе с</dt>
             <dd class="text-ink">{{ formatDate(user?.created_at) }}</dd>
           </div>
         </dl>
-        <p class="text-xs text-muted mt-4">{{ roleHints[user?.role] }}</p>
+        <p class="text-xs text-muted mt-4">{{ user ? roleHints[user.role] : '' }}</p>
       </NCard>
 
       <NCard title="Смена пароля" class="lg:col-span-3">

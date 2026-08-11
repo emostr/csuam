@@ -1,10 +1,11 @@
-<script setup>
+<script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import NInput from '@/components/ui/NInput.vue'
 import NButton from '@/components/ui/NButton.vue'
 import NIcon from '@/components/ui/NIcon.vue'
 import { notify } from '@/lib/notify'
+import { errorMessage } from '@/lib/api'
 import { login } from '@/lib/auth'
 
 const router = useRouter()
@@ -21,9 +22,10 @@ async function submit() {
   loading.value = true
   try {
     await login(username.value, password.value)
-    router.push(route.query.redirect || '/')
+    const redirect = route.query.redirect
+    router.push(typeof redirect === 'string' && redirect ? redirect : '/')
   } catch (e) {
-    notify.error('Не удалось войти', { text: e.message })
+    notify.error('Не удалось войти', { text: errorMessage(e) })
   } finally {
     loading.value = false
   }
