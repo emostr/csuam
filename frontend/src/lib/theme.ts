@@ -3,7 +3,13 @@ import { ref, watch } from 'vue'
 const THEME_KEY = 'ng-theme'
 const ACCENT_KEY = 'ng-accent'
 
-export const ACCENTS = [
+export interface Accent {
+  id: string
+  label: string
+  hex: string
+}
+
+export const ACCENTS: Accent[] = [
   { id: 'teal', label: 'Teal', hex: '#00b294' },
   { id: 'azure', label: 'Azure', hex: '#0078d4' },
   { id: 'magenta', label: 'Magenta', hex: '#e3008c' },
@@ -12,7 +18,7 @@ export const ACCENTS = [
   { id: 'lime', label: 'Lime', hex: '#7cbb00' },
 ]
 
-const stored = (key, fallback) => {
+const stored = (key: string, fallback: string): string => {
   try {
     return localStorage.getItem(key) || fallback
   } catch {
@@ -47,7 +53,7 @@ export function toggleTheme() {
   theme.value = theme.value === 'dark' ? 'light' : 'dark'
 }
 
-export function setAccent(id) {
+export function setAccent(id: string) {
   accent.value = id
 }
 

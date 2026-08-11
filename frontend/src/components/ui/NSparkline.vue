@@ -1,12 +1,15 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 
-const props = defineProps({
-  points: { type: Array, default: () => [] },
-  width: { type: Number, default: 100 },
-  height: { type: Number, default: 32 },
-  area: { type: Boolean, default: true },
-})
+const props = withDefaults(
+  defineProps<{
+    points?: number[]
+    width?: number
+    height?: number
+    area?: boolean
+  }>(),
+  { points: () => [], width: 100, height: 32, area: true },
+)
 
 const geo = computed(() => {
   const pts = props.points

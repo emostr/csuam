@@ -1,11 +1,14 @@
-<script setup>
-defineProps({
-  name: { type: String, required: true },
-  size: { type: [Number, String], default: 20 },
-  stroke: { type: [Number, String], default: 2 },
-})
+<script setup lang="ts">
+withDefaults(
+  defineProps<{
+    name: string
+    size?: number | string
+    stroke?: number | string
+  }>(),
+  { size: 20, stroke: 2 },
+)
 
-const P = {
+const P: Record<string, string> = {
   dashboard: '<rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/>',
   users: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
   user: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',

@@ -1,16 +1,23 @@
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import NIcon from './NIcon.vue'
 
-const props = defineProps({
-  align: { type: String, default: 'right' },
-  width: { type: Number, default: 200 },
-})
+const props = withDefaults(
+  defineProps<{
+    align?: 'left' | 'right'
+    width?: number
+  }>(),
+  { align: 'right', width: 200 },
+)
 
 const open = ref(false)
-const trigger = ref(null)
-const menu = ref(null)
-const pos = ref({ top: 0, left: 0, origin: 'top' })
+const trigger = ref<HTMLElement | null>(null)
+const menu = ref<HTMLElement | null>(null)
+const pos = ref<{ top: number; left: number; origin: 'top' | 'bottom' }>({
+  top: 0,
+  left: 0,
+  origin: 'top',
+})
 
 function place() {
   const el = trigger.value
@@ -47,12 +54,9 @@ function close() {
   open.value = false
 }
 
-function onDocClick(e) {
-  if (
-    trigger.value?.contains(e.target) ||
-    menu.value?.contains(e.target)
-  )
-    return
+function onDocClick(e: MouseEvent) {
+  const t = e.target instanceof Node ? e.target : null
+  if (t && (trigger.value?.contains(t) || menu.value?.contains(t))) return
   close()
 }
 
@@ -60,7 +64,7 @@ function onScroll() {
   if (open.value) close()
 }
 
-function onKey(e) {
+function onKey(e: KeyboardEvent) {
   if (e.key === 'Escape') close()
 }
 

@@ -1,16 +1,21 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 
-const props = defineProps({
-  value: { type: Number, default: 0 },
-  max: { type: Number, default: 100 },
-  variant: { type: String, default: 'accent' },
-  label: { type: String, default: '' },
-  showValue: { type: Boolean, default: false },
-})
+type Variant = 'accent' | 'success' | 'warning' | 'danger'
+
+const props = withDefaults(
+  defineProps<{
+    value?: number
+    max?: number
+    variant?: Variant
+    label?: string
+    showValue?: boolean
+  }>(),
+  { value: 0, max: 100, variant: 'accent', label: '', showValue: false },
+)
 
 const pct = computed(() => Math.max(0, Math.min(100, (props.value / props.max) * 100)))
-const barColor = {
+const barColor: Record<Variant, string> = {
   accent: 'bg-accent',
   success: 'bg-success',
   warning: 'bg-warning',
@@ -27,7 +32,7 @@ const barColor = {
     <div class="h-2 w-full bg-surface-3 overflow-hidden">
       <div
         class="h-full transition-[width] duration-500 ease-out"
-        :class="barColor[variant] || barColor.accent"
+        :class="barColor[variant]"
         :style="{ width: pct + '%' }"
       />
     </div>

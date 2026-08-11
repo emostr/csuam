@@ -1,10 +1,13 @@
-<script setup>
+<script setup lang="ts">
 import NIcon from './NIcon.vue'
 
-defineProps({
-  icon: { type: String, default: '' },
-  danger: { type: Boolean, default: false },
-})
+withDefaults(
+  defineProps<{
+    icon?: string
+    danger?: boolean
+  }>(),
+  { icon: '', danger: false },
+)
 </script>
 
 <template>

@@ -1,12 +1,15 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 
-const props = defineProps({
-  name: { type: String, default: '' },
-  src: { type: String, default: '' },
-  size: { type: Number, default: 40 },
-  square: { type: Boolean, default: true },
-})
+const props = withDefaults(
+  defineProps<{
+    name?: string
+    src?: string
+    size?: number
+    square?: boolean
+  }>(),
+  { name: '', src: '', size: 40, square: true },
+)
 
 const initials = computed(() =>
   props.name

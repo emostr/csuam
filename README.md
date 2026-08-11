@@ -6,7 +6,7 @@
 
 ## Стек
 
-- Фронтенд: Vue 3, TailwindCSS, sweetalert2-neutral, Chart.js (на основе собственного шаблона NightingaleUI-template-Vue — https://github.com/emostr/NightingaleUI-template-Vue)
+- Фронтенд: TypeScript, Vue 3, TailwindCSS, sweetalert2-neutral, Chart.js (на основе собственного шаблона NightingaleUI-template-Vue — https://github.com/emostr/NightingaleUI-template-Vue)
 - Бэкенд: Go + Chi + sqlc (pgx)
 - СУБД: PostgreSQL
 - Хранилище файлов: S3-совместимое (MinIO)

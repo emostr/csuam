@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import NIcon from '../ui/NIcon.vue'
@@ -6,13 +6,22 @@ import NAvatar from '../ui/NAvatar.vue'
 import { user, isModerator, isHeadTeacher } from '@/lib/auth'
 import { ROLE_LABELS } from '@/lib/catalog'
 
-defineProps({
-  open: { type: Boolean, default: false },
-})
-defineEmits(['close'])
+interface NavLink {
+  to: string
+  label: string
+  icon: string
+}
 
-const sections = computed(() => {
-  const archive = {
+interface NavSection {
+  title: string
+  links: NavLink[]
+}
+
+withDefaults(defineProps<{ open?: boolean }>(), { open: false })
+defineEmits<{ close: [] }>()
+
+const sections = computed<NavSection[]>(() => {
+  const archive: NavSection = {
     title: 'Архив',
     links: [
       { to: '/', label: 'Главная', icon: 'home' },
@@ -23,7 +32,7 @@ const sections = computed(() => {
       { to: '/documents', label: 'Документы', icon: 'fileText' },
     ],
   }
-  const manage = {
+  const manage: NavSection = {
     title: 'Управление',
     links: [{ to: '/analytics', label: 'Аналитика', icon: 'barChart' }],
   }

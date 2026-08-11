@@ -1,12 +1,12 @@
-<script setup>
+<script setup lang="ts">
 import { computed, ref, watchEffect } from 'vue'
 import NIcon from '@/components/ui/NIcon.vue'
 import NButton from '@/components/ui/NButton.vue'
 import { renderMarkdown } from '@/lib/markdown'
+import type { Material } from '@/lib/types'
 
-const props = defineProps({
-  material: { type: Object, required: true },
-})
+const props = defineProps<{ material: Material }>()
+defineEmits<{ download: [] }>()
 
 const fileUrl = computed(() => `/api/materials/${props.material.id}/file`)
 const mime = computed(() => props.material.file_mime || '')
@@ -16,7 +16,18 @@ const ext = computed(() => {
   return i >= 0 ? name.slice(i + 1).toLowerCase() : ''
 })
 
-const kind = computed(() => {
+type ViewKind =
+  | 'content'
+  | 'empty'
+  | 'image'
+  | 'video'
+  | 'audio'
+  | 'pdf'
+  | 'html'
+  | 'markdown'
+  | 'other'
+
+const kind = computed<ViewKind>(() => {
   if (props.material.content != null) return 'content'
   if (!props.material.file_name) return 'empty'
   if (mime.value.startsWith('image/')) return 'image'

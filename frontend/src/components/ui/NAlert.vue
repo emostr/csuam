@@ -1,22 +1,27 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import NIcon from './NIcon.vue'
 
-const props = defineProps({
-  variant: { type: String, default: 'info' },
-  title: { type: String, default: '' },
-  closable: { type: Boolean, default: false },
-})
-defineEmits(['close'])
+type Variant = 'info' | 'success' | 'warning' | 'danger'
 
-const map = {
+const props = withDefaults(
+  defineProps<{
+    variant?: Variant
+    title?: string
+    closable?: boolean
+  }>(),
+  { variant: 'info', title: '', closable: false },
+)
+defineEmits<{ close: [] }>()
+
+const map: Record<Variant, { border: string; icon: string; tint: string }> = {
   info: { border: 'border-l-info', icon: 'info', tint: 'text-info' },
   success: { border: 'border-l-success', icon: 'checkCircle', tint: 'text-success' },
   warning: { border: 'border-l-warning', icon: 'alert', tint: 'text-warning' },
   danger: { border: 'border-l-danger', icon: 'alert', tint: 'text-danger' },
 }
 
-const conf = computed(() => map[props.variant] || map.info)
+const conf = computed(() => map[props.variant])
 </script>
 
 <template>

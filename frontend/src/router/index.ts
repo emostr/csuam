@@ -1,8 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import type { RouteRecordRaw } from 'vue-router'
 import AppShell from '@/components/layout/AppShell.vue'
 import { user, authReady, fetchMe } from '@/lib/auth'
 
-const routes = [
+const routes: RouteRecordRaw[] = [
   {
     path: '/login',
     name: 'login',

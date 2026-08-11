@@ -1,22 +1,39 @@
-<script setup>
+<script setup lang="ts">
 import { computed, useId } from 'vue'
 import NIcon from './NIcon.vue'
 
-const props = defineProps({
-  modelValue: { type: [String, Number], default: '' },
-  label: { type: String, default: '' },
-  options: { type: Array, default: () => [] },
-  placeholder: { type: String, default: 'Выберите…' },
-  hint: { type: String, default: '' },
-  disabled: { type: Boolean, default: false },
-})
-defineEmits(['update:modelValue'])
+export interface SelectOption {
+  value: string | number
+  label: string
+}
+
+const props = withDefaults(
+  defineProps<{
+    modelValue?: string | number
+    label?: string
+    options?: Array<SelectOption | string | number>
+    placeholder?: string
+    hint?: string
+    disabled?: boolean
+  }>(),
+  {
+    modelValue: '',
+    label: '',
+    options: () => [],
+    placeholder: 'Выберите…',
+    hint: '',
+    disabled: false,
+  },
+)
+const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
+
+function onChange(e: Event) {
+  emit('update:modelValue', (e.target as HTMLSelectElement).value)
+}
 
 const uid = useId()
-const normalized = computed(() =>
-  props.options.map((o) =>
-    typeof o === 'object' ? o : { value: o, label: String(o) },
-  ),
+const normalized = computed<SelectOption[]>(() =>
+  props.options.map((o) => (typeof o === 'object' ? o : { value: o, label: String(o) })),
 )
 </script>
 
@@ -29,7 +46,7 @@ const normalized = computed(() =>
         :value="modelValue"
         :disabled="disabled"
         class="w-full h-11 bg-surface-2 text-ink text-sm border border-line focus:border-accent outline-none px-3 pr-9 appearance-none cursor-pointer transition-colors disabled:opacity-50"
-        @change="$emit('update:modelValue', $event.target.value)"
+        @change="onChange"
       >
         <option value="" disabled>{{ placeholder }}</option>
         <option v-for="o in normalized" :key="o.value" :value="o.value">{{ o.label }}</option>

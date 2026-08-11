@@ -1,12 +1,17 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 
-const props = defineProps({
-  variant: { type: String, default: 'neutral' },
-  dot: { type: Boolean, default: false },
-})
+type Variant = 'neutral' | 'accent' | 'success' | 'warning' | 'danger' | 'info'
 
-const variants = {
+const props = withDefaults(
+  defineProps<{
+    variant?: Variant | string
+    dot?: boolean
+  }>(),
+  { variant: 'neutral', dot: false },
+)
+
+const variants: Record<Variant, string> = {
   neutral: 'bg-surface-3 text-muted',
   accent: 'bg-accent/15 text-accent',
   success: 'bg-success/15 text-success',
@@ -15,7 +20,7 @@ const variants = {
   info: 'bg-info/15 text-info',
 }
 
-const dotColor = {
+const dotColor: Record<Variant, string> = {
   neutral: 'bg-muted',
   accent: 'bg-accent',
   success: 'bg-success',
@@ -24,7 +29,9 @@ const dotColor = {
   info: 'bg-info',
 }
 
-const cls = computed(() => variants[props.variant] || variants.neutral)
+const isVariant = (v: string): v is Variant => v in variants
+const key = computed<Variant>(() => (isVariant(props.variant) ? props.variant : 'neutral'))
+const cls = computed(() => variants[key.value])
 </script>
 
 <template>
@@ -32,7 +39,7 @@ const cls = computed(() => variants[props.variant] || variants.neutral)
     class="inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-bold uppercase tracking-normal"
     :class="cls"
   >
-    <span v-if="dot" class="w-1.5 h-1.5" :class="dotColor[variant]" />
+    <span v-if="dot" class="w-1.5 h-1.5" :class="dotColor[key]" />
     <slot />
   </span>
 </template>

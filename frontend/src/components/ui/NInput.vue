@@ -1,19 +1,36 @@
-<script setup>
+<script setup lang="ts">
 import { computed, useId } from 'vue'
 import NIcon from './NIcon.vue'
 
-const props = defineProps({
-  modelValue: { type: [String, Number], default: '' },
-  label: { type: String, default: '' },
-  type: { type: String, default: 'text' },
-  placeholder: { type: String, default: '' },
-  hint: { type: String, default: '' },
-  error: { type: String, default: '' },
-  icon: { type: String, default: '' },
-  disabled: { type: Boolean, default: false },
-  required: { type: Boolean, default: false },
-})
-defineEmits(['update:modelValue'])
+const props = withDefaults(
+  defineProps<{
+    modelValue?: string | number
+    label?: string
+    type?: string
+    placeholder?: string
+    hint?: string
+    error?: string
+    icon?: string
+    disabled?: boolean
+    required?: boolean
+  }>(),
+  {
+    modelValue: '',
+    label: '',
+    type: 'text',
+    placeholder: '',
+    hint: '',
+    error: '',
+    icon: '',
+    disabled: false,
+    required: false,
+  },
+)
+const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
+
+function onInput(e: Event) {
+  emit('update:modelValue', (e.target as HTMLInputElement).value)
+}
 
 const uid = useId()
 const fieldClass = computed(() => [
@@ -46,7 +63,7 @@ const fieldClass = computed(() => [
         :placeholder="placeholder"
         :disabled="disabled"
         :class="fieldClass"
-        @input="$emit('update:modelValue', $event.target.value)"
+        @input="onInput"
       />
     </div>
     <p v-if="error" class="text-xs text-danger mt-1.5">{{ error }}</p>

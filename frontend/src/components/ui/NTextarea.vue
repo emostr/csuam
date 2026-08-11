@@ -1,16 +1,23 @@
-<script setup>
+<script setup lang="ts">
 import { computed, useId } from 'vue'
 
-const props = defineProps({
-  modelValue: { type: String, default: '' },
-  label: { type: String, default: '' },
-  placeholder: { type: String, default: '' },
-  hint: { type: String, default: '' },
-  error: { type: String, default: '' },
-  rows: { type: Number, default: 4 },
-  disabled: { type: Boolean, default: false },
-})
-defineEmits(['update:modelValue'])
+const props = withDefaults(
+  defineProps<{
+    modelValue?: string
+    label?: string
+    placeholder?: string
+    hint?: string
+    error?: string
+    rows?: number
+    disabled?: boolean
+  }>(),
+  { modelValue: '', label: '', placeholder: '', hint: '', error: '', rows: 4, disabled: false },
+)
+const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
+
+function onInput(e: Event) {
+  emit('update:modelValue', (e.target as HTMLTextAreaElement).value)
+}
 
 const uid = useId()
 const fieldClass = computed(() => [
@@ -31,7 +38,7 @@ const fieldClass = computed(() => [
       :placeholder="placeholder"
       :disabled="disabled"
       :class="fieldClass"
-      @input="$emit('update:modelValue', $event.target.value)"
+      @input="onInput"
     />
     <p v-if="error" class="text-xs text-danger mt-1.5">{{ error }}</p>
     <p v-else-if="hint" class="text-xs text-faint mt-1.5">{{ hint }}</p>

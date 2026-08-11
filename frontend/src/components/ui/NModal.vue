@@ -1,16 +1,21 @@
-<script setup>
+<script setup lang="ts">
 import { watch } from 'vue'
 import NIcon from './NIcon.vue'
 
-const props = defineProps({
-  modelValue: { type: Boolean, default: false },
-  title: { type: String, default: '' },
-  subtitle: { type: String, default: '' },
-  size: { type: String, default: 'md' },
-})
-const emit = defineEmits(['update:modelValue'])
+type Size = 'sm' | 'md' | 'lg' | 'xl'
 
-const sizes = { sm: 'max-w-md', md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-4xl' }
+const props = withDefaults(
+  defineProps<{
+    modelValue?: boolean
+    title?: string
+    subtitle?: string
+    size?: Size
+  }>(),
+  { modelValue: false, title: '', subtitle: '', size: 'md' },
+)
+const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>()
+
+const sizes: Record<Size, string> = { sm: 'max-w-md', md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-4xl' }
 
 function close() {
   emit('update:modelValue', false)
@@ -34,7 +39,7 @@ watch(
         <div class="fixed inset-0 bg-black/60 backdrop-blur-[2px]" @click="close" />
         <div
           class="relative w-full bg-surface border border-line border-l-[3px] border-l-accent shadow-2xl mt-8 sm:mt-16"
-          :class="sizes[size] || sizes.md"
+          :class="sizes[size]"
           role="dialog"
           aria-modal="true"
         >

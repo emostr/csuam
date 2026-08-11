@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { theme, toggleTheme } from '@/lib/theme'
@@ -6,21 +6,22 @@ import { notify } from '@/lib/notify'
 import { api } from '@/lib/api'
 import { user, logout, isModerator } from '@/lib/auth'
 import { ROLE_LABELS } from '@/lib/catalog'
+import type { Notifications } from '@/lib/types'
 import NIcon from '../ui/NIcon.vue'
 import NAvatar from '../ui/NAvatar.vue'
 import NDropdown from '../ui/NDropdown.vue'
 import NDropdownItem from '../ui/NDropdownItem.vue'
 
-defineEmits(['toggle-sidebar'])
+defineEmits<{ 'toggle-sidebar': [] }>()
 
 const router = useRouter()
 const search = ref('')
-const counters = ref({ overdue_loans: 0, pending_materials: 0 })
+const counters = ref<Notifications>({ overdue_loans: 0, pending_materials: 0 })
 
 onMounted(async () => {
   if (!isModerator.value) return
   try {
-    counters.value = await api.get('/notifications')
+    counters.value = await api.get<Notifications>('/notifications')
   } catch {}
 })
 
@@ -119,7 +120,7 @@ async function doLogout() {
       </template>
       <div class="px-3.5 py-2.5 border-b border-line">
         <div class="text-sm font-bold text-ink">{{ user?.full_name }}</div>
-        <div class="text-xs text-muted">{{ ROLE_LABELS[user?.role] || '' }}</div>
+        <div class="text-xs text-muted">{{ user ? ROLE_LABELS[user.role] : '' }}</div>
       </div>
       <NDropdownItem icon="settings" @click="router.push('/settings')">Настройки</NDropdownItem>
       <div class="my-1 border-t border-line" />

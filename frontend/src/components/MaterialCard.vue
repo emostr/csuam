@@ -1,13 +1,12 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import NIcon from '@/components/ui/NIcon.vue'
 import NBadge from '@/components/ui/NBadge.vue'
 import { categoryMeta, STATUS_LABELS, STATUS_VARIANTS, formatDate } from '@/lib/catalog'
+import type { Material } from '@/lib/types'
 
-const props = defineProps({
-  material: { type: Object, required: true },
-})
+const props = defineProps<{ material: Material }>()
 
 const router = useRouter()
 const meta = computed(() => categoryMeta(props.material.category))

@@ -1,14 +1,24 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import NIcon from './NIcon.vue'
 
-const props = defineProps({
-  modelValue: { type: [String, Number], default: '' },
-  tabs: { type: Array, default: () => [] },
-})
-defineEmits(['update:modelValue'])
+export interface TabItem {
+  value: string | number
+  label: string
+  icon?: string
+  badge?: string | number | null
+}
 
-const normalized = computed(() =>
+const props = withDefaults(
+  defineProps<{
+    modelValue?: string | number
+    tabs?: Array<TabItem | string | number>
+  }>(),
+  { modelValue: '', tabs: () => [] },
+)
+defineEmits<{ 'update:modelValue': [value: string | number] }>()
+
+const normalized = computed<TabItem[]>(() =>
   props.tabs.map((t) => (typeof t === 'object' ? t : { value: t, label: String(t) })),
 )
 </script>

@@ -1,12 +1,15 @@
-<script setup>
+<script setup lang="ts">
 import NIcon from './NIcon.vue'
 
-const props = defineProps({
-  modelValue: { type: Boolean, default: false },
-  label: { type: String, default: '' },
-  disabled: { type: Boolean, default: false },
-})
-const emit = defineEmits(['update:modelValue'])
+const props = withDefaults(
+  defineProps<{
+    modelValue?: boolean
+    label?: string
+    disabled?: boolean
+  }>(),
+  { modelValue: false, label: '', disabled: false },
+)
+const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>()
 
 function toggle() {
   if (!props.disabled) emit('update:modelValue', !props.modelValue)

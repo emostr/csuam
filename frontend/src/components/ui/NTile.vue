@@ -1,15 +1,18 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import NIcon from './NIcon.vue'
 
-const props = defineProps({
-  label: { type: String, default: '' },
-  value: { type: [String, Number], default: '' },
-  icon: { type: String, default: '' },
-  delta: { type: [String, Number], default: null },
-  trend: { type: String, default: '' },
-  solid: { type: Boolean, default: false },
-})
+const props = withDefaults(
+  defineProps<{
+    label?: string
+    value?: string | number
+    icon?: string
+    delta?: string | number | null
+    trend?: 'up' | 'down' | ''
+    solid?: boolean
+  }>(),
+  { label: '', value: '', icon: '', delta: null, trend: '', solid: false },
+)
 
 const trendUp = computed(() => props.trend === 'up')
 const trendClass = computed(() =>

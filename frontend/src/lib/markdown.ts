@@ -1,4 +1,4 @@
-export function escapeHtml(s) {
+export function escapeHtml(s: unknown): string {
   return String(s)
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
@@ -6,7 +6,7 @@ export function escapeHtml(s) {
     .replaceAll('"', '&quot;')
 }
 
-function inline(s) {
+function inline(s: string): string {
   return s
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
@@ -18,12 +18,12 @@ function inline(s) {
     .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
 }
 
-export function renderMarkdown(src) {
+export function renderMarkdown(src: string | null | undefined): string {
   const lines = escapeHtml(src || '').split(/\r?\n/)
-  const out = []
-  let list = null
+  const out: string[] = []
+  let list: 'ul' | 'ol' | null = null
   let inCode = false
-  let codeLines = []
+  let codeLines: string[] = []
   let inQuote = false
 
   const closeList = () => {
@@ -92,7 +92,7 @@ export function renderMarkdown(src) {
         out.push(want === 'ul' ? '<ul>' : '<ol>')
         list = want
       }
-      out.push('<li>' + inline((ul || ol)[1]) + '</li>')
+      out.push('<li>' + inline((ul || ol)![1]) + '</li>')
       continue
     }
     closeList()

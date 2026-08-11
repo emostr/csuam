@@ -1,12 +1,15 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 
-const props = defineProps({
-  title: { type: String, default: '' },
-  subtitle: { type: String, default: '' },
-  accent: { type: Boolean, default: false },
-  padding: { type: Boolean, default: true },
-})
+const props = withDefaults(
+  defineProps<{
+    title?: string
+    subtitle?: string
+    accent?: boolean
+    padding?: boolean
+  }>(),
+  { title: '', subtitle: '', accent: false, padding: true },
+)
 
 const rootClass = computed(() => [
   'bg-surface border border-line',

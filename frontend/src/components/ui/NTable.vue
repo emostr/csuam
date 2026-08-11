@@ -1,9 +1,28 @@
-<script setup>
-defineProps({
-  columns: { type: Array, default: () => [] },
-  rows: { type: Array, default: () => [] },
-  hover: { type: Boolean, default: true },
-})
+<script setup lang="ts" generic="T extends object">
+export interface TableColumn {
+  key: string
+  label: string
+  align?: 'left' | 'right' | 'center'
+  width?: string
+}
+
+withDefaults(
+  defineProps<{
+    columns?: TableColumn[]
+    rows?: T[]
+    hover?: boolean
+  }>(),
+  { columns: () => [], rows: () => [], hover: true },
+)
+
+function cell(row: T, key: string): unknown {
+  return (row as Record<string, unknown>)[key]
+}
+
+function rowKey(row: T, i: number): string | number {
+  const id = (row as Record<string, unknown>).id
+  return typeof id === 'string' || typeof id === 'number' ? id : i
+}
 </script>
 
 <template>
@@ -25,7 +44,7 @@ defineProps({
       <tbody>
         <tr
           v-for="(row, i) in rows"
-          :key="row.id ?? i"
+          :key="rowKey(row, i)"
           class="border-b border-line last:border-0 transition-colors"
           :class="hover ? 'hover:bg-surface-2' : ''"
         >
@@ -35,8 +54,8 @@ defineProps({
             class="px-4 py-3 text-ink align-middle"
             :class="col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : ''"
           >
-            <slot :name="col.key" :row="row" :value="row[col.key]">
-              {{ row[col.key] }}
+            <slot :name="col.key" :row="row" :value="cell(row, col.key)">
+              {{ cell(row, col.key) }}
             </slot>
           </td>
         </tr>

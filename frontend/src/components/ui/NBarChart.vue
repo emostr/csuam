@@ -1,10 +1,19 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 
-const props = defineProps({
-  data: { type: Array, default: () => [] },
-  height: { type: Number, default: 200 },
-})
+export interface BarPoint {
+  label: string
+  value: number
+  active?: boolean
+}
+
+const props = withDefaults(
+  defineProps<{
+    data?: BarPoint[]
+    height?: number
+  }>(),
+  { data: () => [], height: 200 },
+)
 
 const max = computed(() => Math.max(...props.data.map((d) => d.value), 1))
 </script>

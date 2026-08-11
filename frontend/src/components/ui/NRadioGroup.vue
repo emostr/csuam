@@ -1,15 +1,23 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 
-const props = defineProps({
-  modelValue: { type: [String, Number], default: '' },
-  options: { type: Array, default: () => [] },
-  label: { type: String, default: '' },
-  inline: { type: Boolean, default: false },
-})
-const emit = defineEmits(['update:modelValue'])
+interface RadioOption {
+  value: string | number
+  label: string
+}
 
-const normalized = computed(() =>
+const props = withDefaults(
+  defineProps<{
+    modelValue?: string | number
+    options?: Array<RadioOption | string | number>
+    label?: string
+    inline?: boolean
+  }>(),
+  { modelValue: '', options: () => [], label: '', inline: false },
+)
+const emit = defineEmits<{ 'update:modelValue': [value: string | number] }>()
+
+const normalized = computed<RadioOption[]>(() =>
   props.options.map((o) => (typeof o === 'object' ? o : { value: o, label: String(o) })),
 )
 </script>

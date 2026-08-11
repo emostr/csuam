@@ -1,12 +1,13 @@
 import { ref, computed } from 'vue'
 import { api } from './api'
+import type { User } from './types'
 
-export const user = ref(null)
+export const user = ref<User | null>(null)
 export const authReady = ref(false)
 
 export async function fetchMe() {
   try {
-    user.value = await api.get('/auth/me')
+    user.value = await api.get<User>('/auth/me')
   } catch {
     user.value = null
   } finally {
@@ -14,8 +15,8 @@ export async function fetchMe() {
   }
 }
 
-export async function login(username, password) {
-  user.value = await api.post('/auth/login', { username, password })
+export async function login(username: string, password: string) {
+  user.value = await api.post<User>('/auth/login', { username, password })
   return user.value
 }
 
@@ -26,7 +27,7 @@ export async function logout() {
   user.value = null
 }
 
-export const isModerator = computed(() =>
-  ['librarian', 'head_teacher'].includes(user.value?.role),
+export const isModerator = computed(
+  () => user.value != null && ['librarian', 'head_teacher'].includes(user.value.role),
 )
 export const isHeadTeacher = computed(() => user.value?.role === 'head_teacher')

@@ -1,27 +1,36 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import NIcon from '@/components/ui/NIcon.vue'
 import NTabs from '@/components/ui/NTabs.vue'
 import { notify } from '@/lib/notify'
 import { renderMarkdown } from '@/lib/markdown'
+import type { ContentFormat } from '@/lib/types'
 
-const props = defineProps({
-  content: { type: String, default: '' },
-  format: { type: String, default: 'html' },
-})
-const emit = defineEmits(['update:content', 'update:format'])
+const props = withDefaults(
+  defineProps<{
+    content?: string
+    format?: ContentFormat
+  }>(),
+  { content: '', format: 'html' },
+)
+const emit = defineEmits<{
+  'update:content': [value: string]
+  'update:format': [value: ContentFormat]
+}>()
 
 const tabs = [
   { value: 'html', label: 'Визуальный', icon: 'edit' },
   { value: 'markdown', label: 'Markdown', icon: 'code' },
 ]
 
-const editor = ref(null)
+const editor = ref<HTMLDivElement | null>(null)
 const mdText = ref(props.format === 'markdown' ? props.content : '')
 
-const mode = computed({
+const mode = computed<string | number>({
   get: () => props.format,
-  set: (v) => switchMode(v),
+  set: (v) => {
+    if (v === 'html' || v === 'markdown') switchMode(v)
+  },
 })
 
 onMounted(() => {
@@ -38,7 +47,7 @@ function onInput() {
   emit('update:content', editor.value?.innerHTML || '')
 }
 
-async function switchMode(v) {
+async function switchMode(v: ContentFormat) {
   if (v === props.format) return
   const hasContent = (props.content || '').trim() !== ''
   if (hasContent) {
@@ -73,7 +82,7 @@ const toolbar = [
   { icon: 'minus', title: 'Разделитель', run: () => exec('insertHorizontalRule') },
 ]
 
-function exec(cmd, value = null) {
+function exec(cmd: string, value?: string) {
   editor.value?.focus()
   document.execCommand(cmd, false, value)
   onInput()
