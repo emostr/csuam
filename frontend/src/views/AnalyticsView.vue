@@ -137,7 +137,7 @@ function catCount(id: MaterialCategory): number {
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <NTile label="Всего единиц в базе" :value="summary.total" icon="box" solid />
         <NTile label="За последний год" :value="summary.monthly.reduce((s, m) => s + m.count, 0)" icon="trendUp" />
-        <NTile v-if="isModerator" label="Сейчас на прокате" :value="summary.active_loans" icon="clock" />
+        <NTile v-if="isModerator" label="Взято книг" :value="summary.active_loans" icon="clock" />
         <NTile v-else label="Библиотека" :value="catCount('library')" icon="book" />
         <NTile
           v-if="isModerator"
