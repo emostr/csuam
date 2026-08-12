@@ -5,9 +5,9 @@ SELECT COUNT(*) FROM materials;
 SELECT category, COUNT(*) AS count FROM materials GROUP BY category;
 
 -- name: MonthlyAdditions :many
-SELECT to_char(date_trunc('month', created_at), 'YYYY-MM') AS month, COUNT(*) AS count
+SELECT DATE_FORMAT(created_at, '%Y-%m') AS month, COUNT(*) AS count
 FROM materials
-WHERE created_at >= date_trunc('month', now()) - interval '11 months'
+WHERE created_at >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 11 MONTH)
 GROUP BY 1
 ORDER BY 1;
 

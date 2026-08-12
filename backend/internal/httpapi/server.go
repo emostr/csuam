@@ -3,7 +3,6 @@ package httpapi
 import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"csuam/backend/internal/config"
 	"csuam/backend/internal/db"
@@ -13,12 +12,11 @@ import (
 type Server struct {
 	cfg   config.Config
 	q     *db.Queries
-	pool  *pgxpool.Pool
 	store *storage.Storage
 }
 
-func NewServer(cfg config.Config, q *db.Queries, pool *pgxpool.Pool, store *storage.Storage) *Server {
-	return &Server{cfg: cfg, q: q, pool: pool, store: store}
+func NewServer(cfg config.Config, q *db.Queries, store *storage.Storage) *Server {
+	return &Server{cfg: cfg, q: q, store: store}
 }
 
 func (s *Server) Router() chi.Router {

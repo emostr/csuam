@@ -29,7 +29,7 @@ func env(key, fallback string) string {
 func Load() Config {
 	return Config{
 		Port:            env("PORT", "8080"),
-		DatabaseURL:     env("DATABASE_URL", "postgres://csuam:csuam@localhost:5432/csuam?sslmode=disable"),
+		DatabaseURL:     env("DATABASE_URL", "csuam:csuam@tcp(localhost:3306)/csuam?parseTime=true&multiStatements=true"),
 		JWTSecret:       env("JWT_SECRET", "dev-secret-change-me"),
 		PublicURL:       env("PUBLIC_URL", "http://localhost:5173"),
 		MinioEndpoint:   env("MINIO_ENDPOINT", "localhost:9000"),

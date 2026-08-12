@@ -1,35 +1,32 @@
-CREATE TYPE user_role AS ENUM ('teacher', 'librarian', 'head_teacher');
-CREATE TYPE material_category AS ENUM ('awards', 'photos', 'videos', 'library', 'documents');
-CREATE TYPE material_status AS ENUM ('pending', 'approved', 'rejected');
-
 CREATE TABLE users (
-    id BIGSERIAL PRIMARY KEY,
-    username TEXT NOT NULL UNIQUE,
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(255) NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     full_name TEXT NOT NULL,
-    role user_role NOT NULL DEFAULT 'teacher',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+    role ENUM('teacher', 'librarian', 'head_teacher') NOT NULL DEFAULT 'teacher',
+    created_at DATETIME NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE materials (
-    id BIGSERIAL PRIMARY KEY,
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
     title TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',
-    category material_category NOT NULL,
-    status material_status NOT NULL DEFAULT 'approved',
+    category ENUM('awards', 'photos', 'videos', 'library', 'documents') NOT NULL,
+    status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'approved',
     file_key TEXT,
     file_name TEXT,
     file_mime TEXT,
     file_size BIGINT,
-    content TEXT,
+    content MEDIUMTEXT,
     content_format TEXT,
-    condition TEXT NOT NULL DEFAULT '',
+    `condition` TEXT NOT NULL DEFAULT '',
     location TEXT NOT NULL DEFAULT '',
     origin_date DATE,
-    created_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+    created_by BIGINT,
+    created_at DATETIME NOT NULL DEFAULT current_timestamp(),
+    updated_at DATETIME NOT NULL DEFAULT current_timestamp(),
+    CONSTRAINT fk_materials_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE INDEX idx_materials_category ON materials(category);
 CREATE INDEX idx_materials_status ON materials(status);
@@ -37,23 +34,26 @@ CREATE INDEX idx_materials_created_at ON materials(created_at);
 CREATE INDEX idx_materials_origin_date ON materials(origin_date);
 
 CREATE TABLE material_permissions (
-    id BIGSERIAL PRIMARY KEY,
-    material_id BIGINT NOT NULL REFERENCES materials(id) ON DELETE CASCADE,
-    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    granted_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (material_id, user_id)
-);
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    material_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    granted_by BIGINT,
+    created_at DATETIME NOT NULL DEFAULT current_timestamp(),
+    UNIQUE KEY uq_material_permissions (material_id, user_id),
+    CONSTRAINT fk_permissions_material FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE CASCADE,
+    CONSTRAINT fk_permissions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_permissions_granted_by FOREIGN KEY (granted_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE loans (
-    id BIGSERIAL PRIMARY KEY,
-    material_id BIGINT NOT NULL REFERENCES materials(id) ON DELETE CASCADE,
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    material_id BIGINT NOT NULL,
     borrower_name TEXT NOT NULL,
     note TEXT NOT NULL DEFAULT '',
-    taken_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    taken_at DATETIME NOT NULL DEFAULT current_timestamp(),
     due_date DATE NOT NULL,
-    returned_at TIMESTAMPTZ
-);
+    returned_at DATETIME,
+    CONSTRAINT fk_loans_material FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE INDEX idx_loans_material ON loans(material_id);
 CREATE INDEX idx_loans_returned ON loans(returned_at);

@@ -1,15 +1,16 @@
 services:
-  postgres:
-    image: postgres:17-alpine
+  mariadb:
+    image: mariadb:11.8
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-csuam}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-csuam}
-      POSTGRES_DB: ${POSTGRES_DB:-csuam}
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-csuam-root}
+      MARIADB_USER: ${MARIADB_USER:-csuam}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD:-csuam}
+      MARIADB_DATABASE: ${MARIADB_DATABASE:-csuam}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - mariadbdata:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-csuam}"]
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -33,13 +34,13 @@ services:
     build: ./backend
     restart: unless-stopped
     depends_on:
-      postgres:
+      mariadb:
         condition: service_healthy
       minio:
         condition: service_started
     environment:
       PORT: "8080"
-      DATABASE_URL: postgres://${POSTGRES_USER:-csuam}:${POSTGRES_PASSWORD:-csuam}@postgres:5432/${POSTGRES_DB:-csuam}?sslmode=disable
+      DATABASE_URL: ${MARIADB_USER:-csuam}:${MARIADB_PASSWORD:-csuam}@tcp(mariadb:3306)/${MARIADB_DATABASE:-csuam}?parseTime=true&multiStatements=true
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       PUBLIC_URL: ${PUBLIC_URL:-http://localhost:8000}
       MINIO_ENDPOINT: minio:9000
@@ -60,5 +61,5 @@ services:
       - "${HTTP_PORT:-8000}:80"
 
 volumes:
-  pgdata:
+  mariadbdata:
   miniodata:

@@ -8,7 +8,7 @@ const countMaterials = `SELECT COUNT(*) FROM materials`
 
 func (q *Queries) CountMaterials(ctx context.Context) (int64, error) {
 	var n int64
-	err := q.pool.QueryRow(ctx, countMaterials).Scan(&n)
+	err := q.db.QueryRowContext(ctx, countMaterials).Scan(&n)
 	return n, err
 }
 
@@ -17,7 +17,7 @@ SELECT category, COUNT(*) AS count FROM materials GROUP BY category
 `
 
 func (q *Queries) CountMaterialsByCategory(ctx context.Context) ([]CategoryCount, error) {
-	rows, err := q.pool.Query(ctx, countMaterialsByCategory)
+	rows, err := q.db.QueryContext(ctx, countMaterialsByCategory)
 	if err != nil {
 		return nil, err
 	}
@@ -34,15 +34,15 @@ func (q *Queries) CountMaterialsByCategory(ctx context.Context) ([]CategoryCount
 }
 
 const monthlyAdditions = `
-SELECT to_char(date_trunc('month', created_at), 'YYYY-MM') AS month, COUNT(*) AS count
+SELECT DATE_FORMAT(created_at, '%Y-%m') AS month, COUNT(*) AS count
 FROM materials
-WHERE created_at >= date_trunc('month', now()) - interval '11 months'
+WHERE created_at >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 11 MONTH)
 GROUP BY 1
 ORDER BY 1
 `
 
 func (q *Queries) MonthlyAdditions(ctx context.Context) ([]MonthCount, error) {
-	rows, err := q.pool.Query(ctx, monthlyAdditions)
+	rows, err := q.db.QueryContext(ctx, monthlyAdditions)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +62,7 @@ const countPendingMaterials = `SELECT COUNT(*) FROM materials WHERE status = 'pe
 
 func (q *Queries) CountPendingMaterials(ctx context.Context) (int64, error) {
 	var n int64
-	err := q.pool.QueryRow(ctx, countPendingMaterials).Scan(&n)
+	err := q.db.QueryRowContext(ctx, countPendingMaterials).Scan(&n)
 	return n, err
 }
 
@@ -70,6 +70,6 @@ const countActiveLoans = `SELECT COUNT(*) FROM loans WHERE returned_at IS NULL`
 
 func (q *Queries) CountActiveLoans(ctx context.Context) (int64, error) {
 	var n int64
-	err := q.pool.QueryRow(ctx, countActiveLoans).Scan(&n)
+	err := q.db.QueryRowContext(ctx, countActiveLoans).Scan(&n)
 	return n, err
 }

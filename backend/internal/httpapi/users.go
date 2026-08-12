@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/go-sql-driver/mysql"
 
 	"csuam/backend/internal/auth"
 	"csuam/backend/internal/db"
@@ -25,8 +25,8 @@ func (s *Server) requireHeadTeacher(w http.ResponseWriter, r *http.Request) bool
 }
 
 func isUniqueViolation(err error) bool {
-	var pgErr *pgconn.PgError
-	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+	var myErr *mysql.MySQLError
+	return errors.As(err, &myErr) && myErr.Number == 1062
 }
 
 func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {

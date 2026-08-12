@@ -1,15 +1,14 @@
--- name: CreateUser :one
+-- name: CreateUser :execlastid
 INSERT INTO users (username, password_hash, full_name, role)
-VALUES ($1, $2, $3, $4)
-RETURNING id, username, password_hash, full_name, role, created_at;
+VALUES (?, ?, ?, ?);
 
 -- name: GetUserByUsername :one
 SELECT id, username, password_hash, full_name, role, created_at
-FROM users WHERE username = $1;
+FROM users WHERE username = ?;
 
 -- name: GetUserByID :one
 SELECT id, username, password_hash, full_name, role, created_at
-FROM users WHERE id = $1;
+FROM users WHERE id = ?;
 
 -- name: ListUsers :many
 SELECT id, username, password_hash, full_name, role, created_at
@@ -19,7 +18,7 @@ FROM users ORDER BY full_name;
 SELECT COUNT(*) FROM users;
 
 -- name: DeleteUser :exec
-DELETE FROM users WHERE id = $1;
+DELETE FROM users WHERE id = ?;
 
 -- name: UpdateUserPassword :exec
-UPDATE users SET password_hash = $2 WHERE id = $1;
+UPDATE users SET password_hash = ? WHERE id = ?;

@@ -2,13 +2,13 @@ package httpapi
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgx/v5"
 
 	"csuam/backend/internal/db"
 )
@@ -37,7 +37,7 @@ func currentUser(ctx context.Context) db.User {
 }
 
 func isNotFound(err error) bool {
-	return errors.Is(err, pgx.ErrNoRows)
+	return errors.Is(err, sql.ErrNoRows)
 }
 
 func isModerator(u db.User) bool {
