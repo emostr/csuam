@@ -1,4 +1,6 @@
 .env
+deploy.conf
+backups/
 node_modules/
 dist/
 backend/csuam-server

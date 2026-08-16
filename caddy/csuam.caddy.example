@@ -1,0 +1,18 @@
+# пример конфигурации caddy
+# такой файл скрипт deploy.sh генерирует автоматически в /etc/caddy/conf.d/csuam.caddy
+
+example.com {
+	tls admin@example.com
+
+	encode zstd gzip
+
+	request_body {
+		max_size 512MB
+	}
+
+	log {
+		output file /var/log/caddy/csuam.log
+	}
+
+	reverse_proxy 127.0.0.1:8000
+}

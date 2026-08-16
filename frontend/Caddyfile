@@ -1,0 +1,21 @@
+:80 {
+	root * /usr/share/caddy
+	encode zstd gzip
+
+	log {
+		output stdout
+		format console
+	}
+
+	handle /api/* {
+		reverse_proxy backend:8080
+	}
+
+	@static path *.js *.css *.svg *.png *.jpg *.jpeg *.gif *.webp *.woff *.woff2
+	header @static Cache-Control "public, max-age=2592000, immutable"
+
+	handle {
+		try_files {path} /index.html
+		file_server
+	}
+}
