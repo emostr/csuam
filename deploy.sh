@@ -17,6 +17,7 @@ CADDY_MAIN=/etc/caddy/Caddyfile
 CADDY_SITE_DIR=/etc/caddy/conf.d
 CADDY_SITE_FILE="$CADDY_SITE_DIR/csuam.caddy"
 CADDY_IMPORT_LINE='import /etc/caddy/conf.d/*.caddy'
+ERROR_PAGES_DIR=/var/www/csuam-errors
 
 if [[ -t 1 ]]; then
 	C_RESET=$'\033[0m'; C_INFO=$'\033[36m'; C_OK=$'\033[32m'; C_WARN=$'\033[33m'; C_ERR=$'\033[31m'
@@ -395,9 +396,22 @@ ensure_caddy_import() {
 	fi
 }
 
+install_error_pages() {
+	local src="$APP_DIR/frontend/public/errors"
+	local pages=("$src"/*.html)
+	if [[ ! -e ${pages[0]} ]]; then
+		warn "не найдены страницы ошибок в $src — Caddy будет отдавать стандартные ответы"
+		return 0
+	fi
+	mkdir -p "$ERROR_PAGES_DIR"
+	install -m 0644 "${pages[@]}" "$ERROR_PAGES_DIR"/
+	info "страницы ошибок: $ERROR_PAGES_DIR (${#pages[@]} шт.)"
+}
+
 write_caddy_site() {
 	step "Настройка Caddy"
 	ensure_caddy_import
+	install_error_pages
 	mkdir -p /var/log/caddy
 	chown caddy:caddy /var/log/caddy 2>/dev/null || true
 
@@ -422,7 +436,15 @@ write_caddy_site() {
 		printf '\tencode zstd gzip\n\n'
 		printf '\trequest_body {\n\t\tmax_size 512MB\n\t}\n\n'
 		printf '\tlog {\n\t\toutput file /var/log/caddy/csuam.log\n\t}\n\n'
-		printf '\treverse_proxy 127.0.0.1:%s\n' "$HTTP_PORT"
+		printf '\treverse_proxy 127.0.0.1:%s\n\n' "$HTTP_PORT"
+		printf '\thandle_errors {\n'
+		printf '\t\troot * %s\n\n' "$ERROR_PAGES_DIR"
+		printf '\t\t@page expression {err.status_code} in [401, 403, 502]\n'
+		printf '\t\thandle @page {\n\t\t\trewrite * /{err.status_code}.html\n\t\t\tfile_server {\n\t\t\t\tstatus {err.status_code}\n\t\t\t}\n\t\t}\n\n'
+		printf '\t\t@server_error expression {err.status_code} >= 500\n'
+		printf '\t\thandle @server_error {\n\t\t\trewrite * /500.html\n\t\t\tfile_server {\n\t\t\t\tstatus {err.status_code}\n\t\t\t}\n\t\t}\n\n'
+		printf '\t\thandle {\n\t\t\trespond "{err.status_code} {err.status_text}" {err.status_code}\n\t\t}\n'
+		printf '\t}\n'
 		printf '}\n'
 	} >"$CADDY_SITE_FILE"
 
