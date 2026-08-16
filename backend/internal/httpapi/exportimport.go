@@ -22,7 +22,7 @@ type materialCard struct {
 	OriginDate    string   `json:"origin_date,omitempty" xml:"origin_date,omitempty"`
 	Content       string   `json:"content,omitempty" xml:"content,omitempty"`
 	ContentFormat string   `json:"content_format,omitempty" xml:"content_format,omitempty"`
-	FileName      string   `json:"file_name,omitempty" xml:"file_name,omitempty"`
+	Files         []string `json:"files,omitempty" xml:"files>file,omitempty"`
 	CreatedAt     string   `json:"created_at" xml:"created_at"`
 }
 
@@ -44,8 +44,8 @@ func cardFromMaterial(m db.Material) materialCard {
 	if m.ContentFormat != nil {
 		card.ContentFormat = *m.ContentFormat
 	}
-	if m.FileName != nil {
-		card.FileName = *m.FileName
+	for _, f := range m.Files {
+		card.Files = append(card.Files, f.Name)
 	}
 	return card
 }

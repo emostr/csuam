@@ -21,7 +21,8 @@ import {
   formatDateTime,
   formatBytes,
 } from '@/lib/catalog'
-import type { Material, Permission, User } from '@/lib/types'
+import { fileIcon, fileKind, fileUrl } from '@/lib/files'
+import type { Material, MaterialFile, Permission, User } from '@/lib/types'
 import type { SelectOption } from '@/lib/ui'
 
 const route = useRoute()
@@ -38,8 +39,8 @@ const grantUserId = ref('')
 
 const id = computed(() => String(route.params.id))
 const meta = computed(() => categoryMeta(material.value?.category ?? 'photos'))
-const fileUrl = computed(() => `/api/materials/${id.value}/file`)
 const qrUrl = computed(() => `/api/materials/${id.value}/qr`)
+const files = computed<MaterialFile[]>(() => material.value?.files ?? [])
 
 const canManage = computed(() => {
   if (!material.value || !user.value) return false
@@ -68,8 +69,9 @@ async function load() {
 
 onMounted(load)
 
-function download() {
-  window.open(fileUrl.value + '?download=1', '_blank')
+function download(file: MaterialFile) {
+  if (!material.value) return
+  window.open(fileUrl(material.value.id, file) + '?download=1', '_blank')
 }
 
 function exportCard(format: 'json' | 'xml') {
@@ -158,7 +160,7 @@ function printQr() {
     <template v-else-if="material">
       <NPageHeader :title="material.title" :subtitle="`Экспонат №${material.id} · ${meta.label}`">
         <template #actions>
-          <NButton v-if="material.file_name" variant="secondary" icon="download" @click="download">
+          <NButton v-if="files.length === 1" variant="secondary" icon="download" @click="download(files[0])">
             Скачать
           </NButton>
           <NButton variant="secondary" icon="qr" @click="qrOpen = true">QR-код</NButton>
@@ -187,6 +189,28 @@ function printQr() {
       <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div class="xl:col-span-2">
           <MaterialViewer :material="material" @download="download" />
+          <NCard v-if="files.length" title="Файлы" :subtitle="`Прикреплено: ${files.length}`" class="mt-6">
+            <div class="space-y-2">
+              <div
+                v-for="f in files"
+                :key="f.id"
+                class="flex items-center gap-3 bg-surface-2 border border-line px-3 py-2"
+              >
+                <NIcon :name="fileIcon(fileKind(f.name, f.mime))" :size="18" class="text-accent shrink-0" />
+                <div class="min-w-0 flex-1">
+                  <div class="text-sm font-semibold text-ink break-all">{{ f.name }}</div>
+                  <div class="text-xs text-muted">{{ formatBytes(f.size) }}</div>
+                </div>
+                <button
+                  class="text-muted hover:text-accent transition-colors cursor-pointer shrink-0"
+                  title="Скачать"
+                  @click="download(f)"
+                >
+                  <NIcon name="download" :size="16" />
+                </button>
+              </div>
+            </div>
+          </NCard>
         </div>
 
         <div class="space-y-6">
@@ -224,12 +248,9 @@ function printQr() {
                 <dt class="text-muted">Добавил</dt>
                 <dd class="text-ink text-right">{{ material.author_name || '—' }}</dd>
               </div>
-              <div v-if="material.file_name" class="flex justify-between gap-4 py-2.5">
-                <dt class="text-muted">Файл</dt>
-                <dd class="text-ink text-right break-all">
-                  {{ material.file_name }}
-                  <span class="text-faint">({{ formatBytes(material.file_size) }})</span>
-                </dd>
+              <div v-if="files.length" class="flex justify-between gap-4 py-2.5">
+                <dt class="text-muted">Файлов</dt>
+                <dd class="text-ink text-right">{{ files.length }}</dd>
               </div>
             </dl>
           </NCard>

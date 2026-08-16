@@ -10,8 +10,11 @@ const props = defineProps<{ material: Material }>()
 
 const router = useRouter()
 const meta = computed(() => categoryMeta(props.material.category))
-const isImage = computed(() => (props.material.file_mime || '').startsWith('image/'))
-const previewUrl = computed(() => `/api/materials/${props.material.id}/file?thumb=1`)
+const preview = computed(() => props.material.files.find((f) => f.mime.startsWith('image/')) ?? null)
+const previewUrl = computed(() =>
+  preview.value ? `/api/materials/${props.material.id}/files/${preview.value.id}?thumb=1` : '',
+)
+const fileCount = computed(() => props.material.files.length)
 </script>
 
 <template>
@@ -19,15 +22,21 @@ const previewUrl = computed(() => `/api/materials/${props.material.id}/file?thum
     class="text-left bg-surface border border-line hover:border-accent transition-colors ng-tile-press cursor-pointer flex flex-col overflow-hidden"
     @click="router.push(`/material/${material.id}`)"
   >
-    <div class="h-36 bg-surface-2 flex items-center justify-center overflow-hidden shrink-0">
+    <div class="h-36 bg-surface-2 flex items-center justify-center overflow-hidden shrink-0 relative">
       <img
-        v-if="isImage"
+        v-if="preview"
         :src="previewUrl"
         :alt="material.title"
         class="w-full h-full object-cover"
         loading="lazy"
       />
       <NIcon v-else :name="meta.icon" :size="40" class="text-faint" />
+      <span
+        v-if="fileCount > 1"
+        class="absolute bottom-2 right-2 flex items-center gap-1 bg-surface/90 border border-line text-[11px] font-bold text-ink px-1.5 py-0.5"
+      >
+        <NIcon name="archive" :size="12" />{{ fileCount }}
+      </span>
     </div>
     <div class="p-4 flex-1 flex flex-col gap-2">
       <div class="flex items-start justify-between gap-2">

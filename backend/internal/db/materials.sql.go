@@ -10,10 +10,6 @@ type CreateMaterialParams struct {
 	Description   string
 	Category      string
 	Status        string
-	FileKey       *string
-	FileName      *string
-	FileMime      *string
-	FileSize      *int64
 	Content       *string
 	ContentFormat *string
 	Condition     string
@@ -23,14 +19,13 @@ type CreateMaterialParams struct {
 }
 
 const createMaterial = `
-INSERT INTO materials (title, description, category, status, file_key, file_name, file_mime, file_size, content, content_format, ` + "`condition`" + `, location, origin_date, created_by)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO materials (title, description, category, status, content, content_format, ` + "`condition`" + `, location, origin_date, created_by)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 func (q *Queries) CreateMaterial(ctx context.Context, p CreateMaterialParams) (int64, error) {
 	res, err := q.db.ExecContext(ctx, createMaterial,
 		p.Title, p.Description, p.Category, p.Status,
-		p.FileKey, p.FileName, p.FileMime, p.FileSize,
 		p.Content, p.ContentFormat, p.Condition, p.Location,
 		p.OriginDate, p.CreatedBy,
 	)
@@ -42,7 +37,6 @@ func (q *Queries) CreateMaterial(ctx context.Context, p CreateMaterialParams) (i
 
 const materialColumns = `
 m.id, m.title, m.description, m.category, m.status,
-m.file_key, m.file_name, m.file_mime, m.file_size,
 m.content, m.content_format, m.condition, m.location,
 m.origin_date, m.created_by, m.created_at, m.updated_at,
 u.full_name AS author_name
@@ -52,11 +46,11 @@ func scanMaterial(row interface{ Scan(dest ...any) error }) (Material, error) {
 	var m Material
 	err := row.Scan(
 		&m.ID, &m.Title, &m.Description, &m.Category, &m.Status,
-		&m.FileKey, &m.FileName, &m.FileMime, &m.FileSize,
 		&m.Content, &m.ContentFormat, &m.Condition, &m.Location,
 		&m.OriginDate, &m.CreatedBy, &m.CreatedAt, &m.UpdatedAt,
 		&m.AuthorName,
 	)
+	m.Files = []MaterialFile{}
 	return m, err
 }
 
@@ -68,7 +62,16 @@ WHERE m.id = ?
 `
 
 func (q *Queries) GetMaterial(ctx context.Context, id int64) (Material, error) {
-	return scanMaterial(q.db.QueryRowContext(ctx, getMaterial, id))
+	m, err := scanMaterial(q.db.QueryRowContext(ctx, getMaterial, id))
+	if err != nil {
+		return m, err
+	}
+	files, err := q.ListMaterialFiles(ctx, id)
+	if err != nil {
+		return m, err
+	}
+	m.Files = files
+	return m, nil
 }
 
 const hasPermission = `
@@ -129,14 +132,28 @@ func (q *Queries) ListMaterials(ctx context.Context, p ListMaterialsParams) ([]M
 	}
 	defer rows.Close()
 	var items []Material
+	var ids []int64
 	for rows.Next() {
 		m, err := scanMaterial(rows)
 		if err != nil {
 			return nil, err
 		}
 		items = append(items, m)
+		ids = append(ids, m.ID)
 	}
-	return items, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	grouped, err := q.ListMaterialFilesByMaterials(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	for i := range items {
+		if files, ok := grouped[items[i].ID]; ok {
+			items[i].Files = files
+		}
+	}
+	return items, nil
 }
 
 type UpdateMaterialParams struct {

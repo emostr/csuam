@@ -1,21 +1,17 @@
 package httpapi
 
 import (
-	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
-	"mime"
+	"mime/multipart"
 	"net/http"
-	"net/url"
-	"path/filepath"
 	"strings"
 	"time"
 
 	qrcode "github.com/skip2/go-qrcode"
 
 	"csuam/backend/internal/db"
-	"csuam/backend/internal/storage"
 )
 
 var allowedExtensions = map[string]bool{
@@ -127,6 +123,8 @@ func (s *Server) handleCreateMaterial(w http.ResponseWriter, r *http.Request) {
 		CreatedBy: &user.ID,
 	}
 
+	var headers []*multipart.FileHeader
+
 	ct := r.Header.Get("Content-Type")
 	if strings.HasPrefix(ct, "multipart/form-data") {
 		r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize)
@@ -142,39 +140,7 @@ func (s *Server) handleCreateMaterial(w http.ResponseWriter, r *http.Request) {
 		p.OriginDate = parseDate(r.FormValue("origin_date"))
 		p.Content = optStr(r.FormValue("content"))
 		p.ContentFormat = optStr(r.FormValue("content_format"))
-
-		file, header, err := r.FormFile("file")
-		if err == nil {
-			defer file.Close()
-			ext := strings.ToLower(filepath.Ext(header.Filename))
-			if !allowedExtensions[ext] {
-				writeError(w, http.StatusBadRequest, "формат файла не поддерживается")
-				return
-			}
-			contentType := header.Header.Get("Content-Type")
-			if contentType == "" {
-				contentType = mime.TypeByExtension(ext)
-			}
-			if contentType == "" {
-				contentType = "application/octet-stream"
-			}
-			key := storage.NewKey(ext)
-			if err := s.store.Put(r.Context(), key, file, header.Size, contentType); err != nil {
-				writeError(w, http.StatusInternalServerError, "не удалось сохранить файл в хранилище")
-				return
-			}
-			if isRasterImage(contentType) {
-				if _, err := file.Seek(0, io.SeekStart); err == nil {
-					if thumb, err := makeThumbnail(file); err == nil {
-						_ = s.store.Put(r.Context(), thumbKey(key), bytes.NewReader(thumb), int64(len(thumb)), "image/jpeg")
-					}
-				}
-			}
-			p.FileKey = &key
-			p.FileName = &header.Filename
-			p.FileMime = &contentType
-			p.FileSize = &header.Size
-		}
+		headers = formFileHeaders(r)
 	} else {
 		var req struct {
 			Title         string `json:"title"`
@@ -213,9 +179,25 @@ func (s *Server) handleCreateMaterial(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	uploads, err := s.uploadFiles(r.Context(), headers)
+	if err != nil {
+		if errors.Is(err, errUnsupportedFormat) {
+			writeError(w, http.StatusBadRequest, "формат файла не поддерживается")
+		} else {
+			writeError(w, http.StatusInternalServerError, "не удалось сохранить файл в хранилище")
+		}
+		return
+	}
+
 	id, err := s.q.CreateMaterial(r.Context(), p)
 	if err != nil {
+		s.dropUploads(r.Context(), uploads)
 		writeError(w, http.StatusInternalServerError, "не удалось создать материал")
+		return
+	}
+	if err := s.attachFiles(r.Context(), id, uploads); err != nil {
+		s.dropUploads(r.Context(), uploads)
+		writeError(w, http.StatusInternalServerError, "материал создан, но файлы не удалось прикрепить")
 		return
 	}
 	m, err := s.q.GetMaterial(r.Context(), id)
@@ -248,6 +230,18 @@ func (s *Server) getAccessibleMaterial(w http.ResponseWriter, r *http.Request) (
 	return m, true
 }
 
+func (s *Server) getManageableMaterial(w http.ResponseWriter, r *http.Request) (db.Material, bool) {
+	m, ok := s.getAccessibleMaterial(w, r)
+	if !ok {
+		return db.Material{}, false
+	}
+	if !s.canManage(r, currentUser(r.Context()), m) {
+		writeError(w, http.StatusForbidden, "нет прав на изменение")
+		return db.Material{}, false
+	}
+	return m, true
+}
+
 func (s *Server) handleGetMaterial(w http.ResponseWriter, r *http.Request) {
 	m, ok := s.getAccessibleMaterial(w, r)
 	if !ok {
@@ -257,13 +251,8 @@ func (s *Server) handleGetMaterial(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleUpdateMaterial(w http.ResponseWriter, r *http.Request) {
-	m, ok := s.getAccessibleMaterial(w, r)
+	m, ok := s.getManageableMaterial(w, r)
 	if !ok {
-		return
-	}
-	user := currentUser(r.Context())
-	if !s.canManage(r, user, m) {
-		writeError(w, http.StatusForbidden, "нет прав на изменение")
 		return
 	}
 	var req struct {
@@ -327,9 +316,8 @@ func (s *Server) handleDeleteMaterial(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "не удалось удалить материал")
 		return
 	}
-	if m.FileKey != nil {
-		_ = s.store.Delete(r.Context(), *m.FileKey)
-		_ = s.store.Delete(r.Context(), thumbKey(*m.FileKey))
+	for _, f := range m.Files {
+		s.dropObject(r.Context(), f.Key)
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
@@ -369,55 +357,6 @@ func (s *Server) handleApproveMaterial(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleRejectMaterial(w http.ResponseWriter, r *http.Request) {
 	s.setStatus(w, r, db.StatusRejected)
-}
-
-func (s *Server) handleMaterialFile(w http.ResponseWriter, r *http.Request) {
-	m, ok := s.getAccessibleMaterial(w, r)
-	if !ok {
-		return
-	}
-	if m.FileKey == nil {
-		writeError(w, http.StatusNotFound, "у материала нет файла")
-		return
-	}
-	if r.URL.Query().Get("thumb") == "1" && m.FileMime != nil && isRasterImage(*m.FileMime) {
-		if obj, err := s.store.Get(r.Context(), thumbKey(*m.FileKey)); err == nil {
-			if stat, err := obj.Stat(); err == nil {
-				defer obj.Close()
-				w.Header().Set("Content-Type", "image/jpeg")
-				w.Header().Set("Cache-Control", "private, max-age=86400")
-				http.ServeContent(w, r, "thumb.jpg", stat.LastModified, obj)
-				return
-			}
-			obj.Close()
-		}
-	}
-	obj, err := s.store.Get(r.Context(), *m.FileKey)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "не удалось открыть файл")
-		return
-	}
-	defer obj.Close()
-	stat, err := obj.Stat()
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "файл недоступен в хранилище")
-		return
-	}
-
-	name := "file"
-	if m.FileName != nil {
-		name = *m.FileName
-	}
-	disposition := "inline"
-	if r.URL.Query().Get("download") == "1" {
-		disposition = "attachment"
-	}
-	if m.FileMime != nil {
-		w.Header().Set("Content-Type", *m.FileMime)
-	}
-	w.Header().Set("Cache-Control", "private, max-age=86400")
-	w.Header().Set("Content-Disposition", fmt.Sprintf("%s; filename*=UTF-8''%s", disposition, url.PathEscape(name)))
-	http.ServeContent(w, r, name, stat.LastModified, obj)
 }
 
 func (s *Server) handleMaterialQR(w http.ResponseWriter, r *http.Request) {

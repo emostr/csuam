@@ -11,15 +11,22 @@ export interface User {
   created_at: string
 }
 
+export interface MaterialFile {
+  id: number
+  material_id: number
+  name: string
+  mime: string
+  size: number
+  created_at: string
+}
+
 export interface Material {
   id: number
   title: string
   description: string
   category: MaterialCategory
   status: MaterialStatus
-  file_name: string | null
-  file_mime: string | null
-  file_size: number | null
+  files: MaterialFile[]
   content: string | null
   content_format: ContentFormat | null
   condition: string

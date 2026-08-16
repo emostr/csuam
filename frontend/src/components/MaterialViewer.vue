@@ -1,43 +1,60 @@
 <script setup lang="ts">
-import { computed, ref, watchEffect } from 'vue'
+import { computed, ref, watch } from 'vue'
 import NIcon from '@/components/ui/NIcon.vue'
 import NButton from '@/components/ui/NButton.vue'
+import NTabs from '@/components/ui/NTabs.vue'
 import { renderMarkdown } from '@/lib/markdown'
-import type { Material } from '@/lib/types'
+import { fileIcon, fileKind, fileUrl } from '@/lib/files'
+import type { FileKind } from '@/lib/files'
+import type { Material, MaterialFile } from '@/lib/types'
+import type { TabItem } from '@/lib/ui'
 
 const props = defineProps<{ material: Material }>()
-defineEmits<{ download: [] }>()
+defineEmits<{ download: [file: MaterialFile] }>()
 
-const fileUrl = computed(() => `/api/materials/${props.material.id}/file`)
-const mime = computed(() => props.material.file_mime || '')
-const ext = computed(() => {
-  const name = props.material.file_name || ''
-  const i = name.lastIndexOf('.')
-  return i >= 0 ? name.slice(i + 1).toLowerCase() : ''
+interface ViewItem {
+  key: string
+  label: string
+  icon: string
+  kind: FileKind | 'content'
+  file: MaterialFile | null
+}
+
+const items = computed<ViewItem[]>(() => {
+  const list: ViewItem[] = []
+  if (props.material.content != null) {
+    list.push({ key: 'content', label: 'Текст', icon: 'fileText', kind: 'content', file: null })
+  }
+  for (const f of props.material.files) {
+    const kind = fileKind(f.name, f.mime)
+    list.push({ key: `file-${f.id}`, label: f.name, icon: fileIcon(kind), kind, file: f })
+  }
+  return list
 })
 
-type ViewKind =
-  | 'content'
-  | 'empty'
-  | 'image'
-  | 'video'
-  | 'audio'
-  | 'pdf'
-  | 'html'
-  | 'markdown'
-  | 'other'
+const tabs = computed<TabItem[]>(() =>
+  items.value.map((i) => ({ value: i.key, label: i.label, icon: i.icon })),
+)
 
-const kind = computed<ViewKind>(() => {
-  if (props.material.content != null) return 'content'
-  if (!props.material.file_name) return 'empty'
-  if (mime.value.startsWith('image/')) return 'image'
-  if (mime.value.startsWith('video/')) return 'video'
-  if (mime.value.startsWith('audio/')) return 'audio'
-  if (mime.value === 'application/pdf' || ext.value === 'pdf') return 'pdf'
-  if (mime.value === 'text/html' || ext.value === 'html') return 'html'
-  if (ext.value === 'md' || mime.value === 'text/markdown') return 'markdown'
-  return 'other'
-})
+const activeKey = ref('')
+
+watch(
+  items,
+  (list) => {
+    if (!list.some((i) => i.key === activeKey.value)) {
+      activeKey.value = list[0]?.key ?? ''
+    }
+  },
+  { immediate: true },
+)
+
+const active = computed<ViewItem | null>(
+  () => items.value.find((i) => i.key === activeKey.value) ?? null,
+)
+
+const activeUrl = computed(() =>
+  active.value?.file ? fileUrl(props.material.id, active.value.file) : '',
+)
 
 const contentHtml = computed(() => {
   if (props.material.content == null) return ''
@@ -47,61 +64,79 @@ const contentHtml = computed(() => {
   return props.material.content
 })
 
-const mdFileHtml = ref('')
-watchEffect(async () => {
-  if (kind.value !== 'markdown') return
-  try {
-    const res = await fetch(fileUrl.value, { credentials: 'include' })
-    mdFileHtml.value = renderMarkdown(await res.text())
-  } catch {
-    mdFileHtml.value = '<p>Не удалось загрузить файл.</p>'
-  }
-})
+const markdownHtml = ref('')
+
+watch(
+  active,
+  async (item) => {
+    if (!item || item.kind !== 'markdown' || !item.file) {
+      markdownHtml.value = ''
+      return
+    }
+    const url = fileUrl(props.material.id, item.file)
+    markdownHtml.value = ''
+    try {
+      const res = await fetch(url, { credentials: 'include' })
+      markdownHtml.value = renderMarkdown(await res.text())
+    } catch {
+      markdownHtml.value = '<p>Не удалось загрузить файл.</p>'
+    }
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
   <div class="bg-surface border border-line">
-    <div v-if="kind === 'content'" class="p-6 prose-archive" v-html="contentHtml" />
+    <NTabs v-if="items.length > 1" v-model="activeKey" :tabs="tabs" />
 
-    <div v-else-if="kind === 'image'" class="flex items-center justify-center bg-surface-2 p-4">
-      <img :src="fileUrl" :alt="material.title" class="max-w-full max-h-[70vh] object-contain" />
+    <div v-if="active?.kind === 'content'" class="p-6 prose-archive" v-html="contentHtml" />
+
+    <div v-else-if="active?.kind === 'image'" class="flex items-center justify-center bg-surface-2 p-4">
+      <img :src="activeUrl" :alt="active.label" class="max-w-full max-h-[70vh] object-contain" />
     </div>
 
-    <video v-else-if="kind === 'video'" :src="fileUrl" controls class="w-full max-h-[70vh] bg-black" />
+    <video
+      v-else-if="active?.kind === 'video'"
+      :key="activeUrl"
+      :src="activeUrl"
+      controls
+      class="w-full max-h-[70vh] bg-black"
+    />
 
-    <div v-else-if="kind === 'audio'" class="p-6">
-      <audio :src="fileUrl" controls class="w-full" />
+    <div v-else-if="active?.kind === 'audio'" class="p-6">
+      <audio :key="activeUrl" :src="activeUrl" controls class="w-full" />
     </div>
 
     <iframe
-      v-else-if="kind === 'pdf'"
-      :src="fileUrl"
+      v-else-if="active?.kind === 'pdf'"
+      :src="activeUrl"
       class="w-full h-[75vh] border-0"
-      :title="material.title"
+      :title="active.label"
     />
 
     <iframe
-      v-else-if="kind === 'html'"
-      :src="fileUrl"
+      v-else-if="active?.kind === 'html'"
+      :src="activeUrl"
       sandbox=""
       class="w-full h-[70vh] border-0 bg-white"
-      :title="material.title"
+      :title="active.label"
     />
 
-    <div v-else-if="kind === 'markdown'" class="p-6 prose-archive" v-html="mdFileHtml" />
+    <div v-else-if="active?.kind === 'markdown'" class="p-6 prose-archive" v-html="markdownHtml" />
 
-    <div v-else-if="kind === 'other'" class="p-10 flex flex-col items-center text-center gap-3">
+    <div v-else-if="active" class="p-10 flex flex-col items-center text-center gap-3">
       <NIcon name="fileText" :size="44" class="text-faint" />
-      <div class="font-bold text-ink">{{ material.file_name }}</div>
+      <div class="font-bold text-ink break-all">{{ active.label }}</div>
       <p class="text-sm text-muted max-w-sm">
         Предпросмотр этого формата в браузере недоступен. Скачайте файл, чтобы открыть его на устройстве.
       </p>
-      <NButton icon="download" @click="$emit('download')">Скачать файл</NButton>
+      <NButton icon="download" @click="active.file && $emit('download', active.file)">Скачать файл</NButton>
     </div>
 
     <div v-else class="p-10 flex flex-col items-center text-center gap-3">
       <NIcon name="box" :size="44" class="text-faint" />
-      <p class="text-sm text-muted">У этого экспоната нет прикреплённого файла.</p>
+      <p class="text-sm text-muted">У этого экспоната нет прикреплённых файлов.</p>
     </div>
   </div>
 </template>

@@ -1,6 +1,6 @@
 -- name: CreateMaterial :execlastid
-INSERT INTO materials (title, description, category, status, file_key, file_name, file_mime, file_size, content, content_format, `condition`, location, origin_date, created_by)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT INTO materials (title, description, category, status, content, content_format, `condition`, location, origin_date, created_by)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: GetMaterial :one
 SELECT m.*, u.full_name AS author_name

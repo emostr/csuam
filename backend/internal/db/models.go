@@ -34,24 +34,31 @@ type User struct {
 }
 
 type Material struct {
-	ID            int64      `json:"id"`
-	Title         string     `json:"title"`
-	Description   string     `json:"description"`
-	Category      string     `json:"category"`
-	Status        string     `json:"status"`
-	FileKey       *string    `json:"-"`
-	FileName      *string    `json:"file_name"`
-	FileMime      *string    `json:"file_mime"`
-	FileSize      *int64     `json:"file_size"`
-	Content       *string    `json:"content"`
-	ContentFormat *string    `json:"content_format"`
-	Condition     string     `json:"condition"`
-	Location      string     `json:"location"`
-	OriginDate    *time.Time `json:"origin_date"`
-	CreatedBy     *int64     `json:"created_by"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
-	AuthorName    *string    `json:"author_name"`
+	ID            int64          `json:"id"`
+	Title         string         `json:"title"`
+	Description   string         `json:"description"`
+	Category      string         `json:"category"`
+	Status        string         `json:"status"`
+	Content       *string        `json:"content"`
+	ContentFormat *string        `json:"content_format"`
+	Condition     string         `json:"condition"`
+	Location      string         `json:"location"`
+	OriginDate    *time.Time     `json:"origin_date"`
+	CreatedBy     *int64         `json:"created_by"`
+	CreatedAt     time.Time      `json:"created_at"`
+	UpdatedAt     time.Time      `json:"updated_at"`
+	AuthorName    *string        `json:"author_name"`
+	Files         []MaterialFile `json:"files"`
+}
+
+type MaterialFile struct {
+	ID         int64     `json:"id"`
+	MaterialID int64     `json:"material_id"`
+	Key        string    `json:"-"`
+	Name       string    `json:"name"`
+	Mime       string    `json:"mime"`
+	Size       int64     `json:"size"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 type Permission struct {
