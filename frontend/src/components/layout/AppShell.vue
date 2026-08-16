@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import Sidebar from './Sidebar.vue'
 import Topbar from './Topbar.vue'
+import PoweredBy from '@/components/PoweredBy.vue'
 
 const sidebarOpen = ref(false)
 </script>
@@ -29,8 +30,9 @@ const sidebarOpen = ref(false)
         </RouterView>
       </main>
 
-      <footer class="border-t border-line px-4 sm:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+      <footer class="border-t border-line px-4 sm:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-3">
         <p class="text-xs text-faint">ЦСУАМ "Архивли"</p>
+        <PoweredBy />
         <div class="flex items-center gap-4 text-xs text-faint">
           <span>2026</span>
         </div>
