@@ -51,7 +51,7 @@ docker compose up -d --build
 
 ## Запуск в проде
 
-Развёртывание на Debian или Ubuntu полностью автоматизировано скриптом "deploy.sh":
+Развёртывание на Debian Linux полностью автоматизировано скриптом "deploy.sh":
 
 ```bash
 cp deploy.conf.example deploy.conf
