@@ -77,7 +77,7 @@ sudo ./deploy.sh
 
 ## Разработка
 
-Бэкенд (Go 1.25+):
+Бэкенд (Go 1.27+):
 
 ```bash
 cd backend
@@ -85,7 +85,7 @@ go mod tidy
 go run ./cmd/server
 ```
 
-Фронтенд (Node 20+):
+Фронтенд (Node 22.12+):
 
 ```bash
 cd frontend
