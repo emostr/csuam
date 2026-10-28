@@ -9,7 +9,7 @@
 - Фронтенд: TypeScript 7, Vue 3, TailwindCSS
 - Бэкенд: Go, Chi, sqlc (pgx)
 - СУБД: PostgreSQL
-- Хранилище файлов: S3-совместимое (MinIO)
+- Хранилище файлов: S3-совместимое (Garage)
 - Сервер: Caddy, Docker
 
 ## Возможности
@@ -93,7 +93,7 @@ npm install
 npm run dev
 ```
 
-Дев-сервер Vite проксирует /api на localhost:8080. PostgreSQL и MinIO нужно запускать из compose: docker compose up -d postgres minio
+Дев-сервер Vite проксирует /api на localhost:8080. PostgreSQL и Garage нужно запускать из compose: docker compose up -d postgres garage
 
 SQL-запросы описаны в backend/queries/ в формате sqlc, конфиг backend/sqlc.yaml, схема в backend/internal/migrate/sql/. Миграции применяются автоматически при старте.
 
@@ -105,6 +105,7 @@ SQL-запросы описаны в backend/queries/ в формате sqlc, к
 │   ├── internal/
 │   └── queries/
 ├── frontend/
+├── garage/
 ├── caddy/
 ├── deploy.sh
 └── docker-compose.yml

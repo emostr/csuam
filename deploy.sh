@@ -77,8 +77,7 @@ load_config() {
 	: "${SSH_PORT:=22}"
 	: "${POSTGRES_USER:=csuam}"
 	: "${POSTGRES_DB:=csuam}"
-	: "${MINIO_ROOT_USER:=minioadmin}"
-	: "${MINIO_BUCKET:=csuam}"
+	: "${S3_BUCKET:=csuam}"
 	: "${BACKUP_BEFORE_DEPLOY:=yes}"
 	: "${BACKUP_KEEP:=10}"
 
@@ -91,6 +90,12 @@ validate_config() {
 	[[ $DOMAIN =~ ^[A-Za-z0-9.-]+$ ]] || die "DOMAIN содержит недопустимые символы: $DOMAIN"
 	[[ $HTTP_PORT =~ ^[0-9]+$ ]] || die "HTTP_PORT должен быть числом"
 	[[ $SSH_PORT =~ ^[0-9]+$ ]] || die "SSH_PORT должен быть числом"
+	[[ -z ${GARAGE_RPC_SECRET:-} || $GARAGE_RPC_SECRET =~ ^[0-9a-fA-F]{64}$ ]] \
+		|| die "GARAGE_RPC_SECRET должен состоять из 64 шестнадцатеричных символов (openssl rand -hex 32)"
+	[[ -z ${S3_ACCESS_KEY:-} || $S3_ACCESS_KEY =~ ^[A-Za-z0-9._-]{8,}$ ]] \
+		|| die "S3_ACCESS_KEY: не короче 8 символов, только латиница, цифры и . _ -"
+	[[ -z ${S3_SECRET_KEY:-} || ${#S3_SECRET_KEY} -ge 16 ]] || die "S3_SECRET_KEY должен быть не короче 16 символов"
+	[[ $S3_BUCKET =~ ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$ ]] || die "S3_BUCKET не подходит как имя бакета: $S3_BUCKET"
 
 	case $TLS_MODE in
 		auto)
@@ -264,6 +269,14 @@ gen_secret() {
 	printf '%s' "${raw:0:${1:-32}}"
 }
 
+gen_hex() {
+	openssl rand -hex 32
+}
+
+gen_access_key() {
+	printf 'GK%s' "$(openssl rand -hex 12)"
+}
+
 env_value() {
 	local key=$1 line
 	[[ -f $ENV_FILE ]] || return 1
@@ -273,7 +286,7 @@ env_value() {
 }
 
 resolve_secret() {
-	local name=$1
+	local name=$1 generator=${2:-gen_secret}
 	local configured="${!name:-}"
 	local existing
 	existing=$(env_value "$name" || true)
@@ -285,7 +298,7 @@ resolve_secret() {
 	elif [[ -n $existing ]]; then
 		printf '%s' "$existing"
 	else
-		gen_secret 32
+		"$generator"
 	fi
 }
 
@@ -294,9 +307,11 @@ write_env() {
 	local scheme=https
 	[[ $TLS_MODE == off ]] && scheme=http
 
-	local db_pass minio_pass jwt seed_head seed_lib seed_teacher
+	local db_pass rpc_secret s3_access s3_secret jwt seed_head seed_lib seed_teacher
 	db_pass=$(resolve_secret POSTGRES_PASSWORD)
-	minio_pass=$(resolve_secret MINIO_ROOT_PASSWORD)
+	rpc_secret=$(resolve_secret GARAGE_RPC_SECRET gen_hex)
+	s3_access=$(resolve_secret S3_ACCESS_KEY gen_access_key)
+	s3_secret=$(resolve_secret S3_SECRET_KEY gen_hex)
 	jwt=$(resolve_secret JWT_SECRET)
 	seed_head=$(resolve_secret SEED_HEAD_TEACHER_PASSWORD)
 	seed_lib=$(resolve_secret SEED_LIBRARIAN_PASSWORD)
@@ -312,9 +327,10 @@ POSTGRES_USER=$POSTGRES_USER
 POSTGRES_PASSWORD=$db_pass
 POSTGRES_DB=$POSTGRES_DB
 
-MINIO_ROOT_USER=$MINIO_ROOT_USER
-MINIO_ROOT_PASSWORD=$minio_pass
-MINIO_BUCKET=$MINIO_BUCKET
+GARAGE_RPC_SECRET=$rpc_secret
+S3_ACCESS_KEY=$s3_access
+S3_SECRET_KEY=$s3_secret
+S3_BUCKET=$S3_BUCKET
 
 JWT_SECRET=$jwt
 PUBLIC_URL=$scheme://$DOMAIN

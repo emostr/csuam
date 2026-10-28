@@ -58,9 +58,14 @@ POSTGRES_USER=csuam
 POSTGRES_PASSWORD=
 POSTGRES_DB=csuam
 
-MINIO_ROOT_USER=minioadmin
-MINIO_ROOT_PASSWORD=
-MINIO_BUCKET=csuam
+# Хранилище файлов Garage. Ключ доступа и бакет создаются при первом запуске;
+# если потом сменить S3_SECRET_KEY, Garage откажется стартовать со старым ключом.
+# GARAGE_RPC_SECRET — 64 шестнадцатеричных символа (openssl rand -hex 32).
+
+GARAGE_RPC_SECRET=
+S3_ACCESS_KEY=
+S3_SECRET_KEY=
+S3_BUCKET=csuam
 
 JWT_SECRET=
 

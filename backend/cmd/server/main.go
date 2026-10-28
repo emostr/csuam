@@ -75,17 +75,17 @@ func main() {
 
 	store, err := storage.New(cfg)
 	if err != nil {
-		log.Fatalf("err minio connect: %v", err)
+		log.Fatalf("err s3 connect: %v", err)
 	}
 	for i := 0; i < 30; i++ {
 		if err = store.EnsureBucket(ctx); err == nil {
 			break
 		}
-		log.Printf("minio: %v", err)
+		log.Printf("s3: %v", err)
 		time.Sleep(2 * time.Second)
 	}
 	if err != nil {
-		log.Fatalf("minio not available: %v", err)
+		log.Fatalf("s3 not available: %v", err)
 	}
 
 	server := httpapi.NewServer(cfg, queries, store)

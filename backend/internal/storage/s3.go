@@ -15,17 +15,19 @@ import (
 type Storage struct {
 	client *minio.Client
 	bucket string
+	region string
 }
 
 func New(cfg config.Config) (*Storage, error) {
-	client, err := minio.New(cfg.MinioEndpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(cfg.MinioAccessKey, cfg.MinioSecretKey, ""),
-		Secure: cfg.MinioUseSSL,
+	client, err := minio.New(cfg.S3Endpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(cfg.S3AccessKey, cfg.S3SecretKey, ""),
+		Secure: cfg.S3UseSSL,
+		Region: cfg.S3Region,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &Storage{client: client, bucket: cfg.MinioBucket}, nil
+	return &Storage{client: client, bucket: cfg.S3Bucket, region: cfg.S3Region}, nil
 }
 
 func (s *Storage) EnsureBucket(ctx context.Context) error {
@@ -34,7 +36,7 @@ func (s *Storage) EnsureBucket(ctx context.Context) error {
 		return err
 	}
 	if !exists {
-		return s.client.MakeBucket(ctx, s.bucket, minio.MakeBucketOptions{})
+		return s.client.MakeBucket(ctx, s.bucket, minio.MakeBucketOptions{Region: s.region})
 	}
 	return nil
 }
