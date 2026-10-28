@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Автоматическое развёртывание на Debian
-# Ставит Docker и Caddy, собирает и запускает стек, настраивает HTTPS
+# Ставит Docker, nginx и certbot, собирает и запускает стек, настраивает HTTPS
 # Все параметры задаются в deploy.conf (см. deploy.conf.example)
 #
 # Запуск:  sudo ./deploy.sh [--config FILE] [--check] [--skip-packages]
@@ -13,11 +13,10 @@ CONFIG_FILE="$SCRIPT_DIR/deploy.conf"
 CHECK_ONLY=no
 SKIP_PACKAGES=no
 
-CADDY_MAIN=/etc/caddy/Caddyfile
-CADDY_SITE_DIR=/etc/caddy/conf.d
-CADDY_SITE_FILE="$CADDY_SITE_DIR/csuam.caddy"
-CADDY_IMPORT_LINE='import /etc/caddy/conf.d/*.caddy'
+NGINX_SITE_FILE=/etc/nginx/conf.d/csuam.conf
 ERROR_PAGES_DIR=/var/www/csuam-errors
+ACME_WEBROOT=/var/www/letsencrypt
+SELF_SIGNED_DIR=/etc/ssl/csuam
 
 if [[ -t 1 ]]; then
 	C_RESET=$'\033[0m'; C_INFO=$'\033[36m'; C_OK=$'\033[32m'; C_WARN=$'\033[33m'; C_ERR=$'\033[31m'
@@ -39,7 +38,7 @@ usage() {
 
   sudo ./deploy.sh                  полное развёртывание (повторный запуск = обновление)
   sudo ./deploy.sh --check          проверить конфигурацию и окружение, ничего не менять
-  sudo ./deploy.sh --skip-packages  не трогать apt-пакеты (Docker и Caddy уже стоят)
+  sudo ./deploy.sh --skip-packages  не трогать apt-пакеты (Docker, nginx и certbot уже стоят)
   ./deploy.sh --help                эта справка
 
   --config FILE                     путь к конфигурации (по умолчанию ./deploy.conf)
@@ -66,13 +65,13 @@ load_config() {
 	: "${DOMAIN:=}"
 	: "${ACME_EMAIL:=}"
 	: "${TLS_MODE:=auto}"
-	: "${CADDY_STAGING:=no}"
+	: "${ACME_STAGING:=${CADDY_STAGING:-no}}"
 	: "${APP_DIR:=$SCRIPT_DIR}"
 	: "${HTTP_PORT:=8000}"
 	: "${HTTP_BIND:=127.0.0.1}"
 	: "${INSTALL_DOCKER:=yes}"
-	: "${INSTALL_CADDY:=yes}"
-	: "${DISABLE_NGINX:=yes}"
+	: "${INSTALL_NGINX:=${INSTALL_CADDY:-yes}}"
+	: "${DISABLE_CADDY:=yes}"
 	: "${FIREWALL:=no}"
 	: "${SSH_PORT:=22}"
 	: "${POSTGRES_USER:=csuam}"
@@ -155,9 +154,9 @@ check_ports() {
 		owner=$(port_owner "$port")
 		[[ -z $owner ]] && continue
 		case $owner in
-			caddy) info "порт $port уже занят caddy — он будет перенастроен" ;;
-			nginx) info "порт $port занят nginx — потребуется его отключить (DISABLE_NGINX=$DISABLE_NGINX)" ;;
-			*) warn "порт $port занят процессом $owner — Caddy не сможет его открыть" ;;
+			nginx) info "порт $port уже занят nginx — он будет перенастроен" ;;
+			caddy) info "порт $port занят caddy — потребуется его отключить (DISABLE_CADDY=$DISABLE_CADDY)" ;;
+			*) warn "порт $port занят процессом $owner — nginx не сможет его открыть" ;;
 		esac
 	done
 }
@@ -177,8 +176,7 @@ install_base_packages() {
 	step "Базовые пакеты"
 	info "обновляю списки пакетов"
 	apt-get update -qq
-	apt_install ca-certificates curl gnupg openssl git rsync iproute2 tar gzip \
-		debian-keyring debian-archive-keyring apt-transport-https
+	apt_install ca-certificates curl gnupg openssl git rsync iproute2 tar gzip
 	ok "базовые пакеты на месте"
 }
 
@@ -202,23 +200,27 @@ install_docker() {
 	ok "Docker установлен"
 }
 
-install_caddy() {
-	step "Caddy"
-	if command -v caddy >/dev/null; then
-		ok "Caddy уже установлен ($(caddy version | head -n1))"
+nginx_version() {
+	nginx -v 2>&1 | sed -n 's#^nginx version: nginx/\([0-9.]*\).*#\1#p'
+}
+
+install_nginx() {
+	step "nginx и certbot"
+	local packages=(nginx) pkg missing=()
+	[[ $TLS_MODE == auto ]] && packages+=(certbot)
+	for pkg in "${packages[@]}"; do
+		command -v "$pkg" >/dev/null || missing+=("$pkg")
+	done
+	if [[ ${#missing[@]} -eq 0 ]]; then
+		ok "уже установлены: ${packages[*]} (nginx $(nginx_version))"
 		return
 	fi
-	if [[ $INSTALL_CADDY != yes ]]; then
-		die "Caddy не установлен, а INSTALL_CADDY=no"
+	if [[ $INSTALL_NGINX != yes ]]; then
+		die "не установлены ${missing[*]}, а INSTALL_NGINX=no"
 	fi
-	curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
-		| gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-	curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
-		-o /etc/apt/sources.list.d/caddy-stable.list
-	apt-get update -qq
-	apt_install caddy
-	systemctl enable caddy >/dev/null
-	ok "Caddy установлен"
+	apt_install "${packages[@]}"
+	systemctl enable nginx >/dev/null
+	ok "установлены: ${packages[*]} (nginx $(nginx_version))"
 }
 
 backup_path() {
@@ -229,26 +231,22 @@ backup_path() {
 	cp -a "$src" "$BACKUP_DIR/${name}.$(date +%Y%m%d-%H%M%S).bak"
 }
 
-disable_nginx() {
-	systemctl is-enabled nginx >/dev/null 2>&1 || systemctl is-active --quiet nginx || return 0
-	step "Миграция с nginx"
-	if [[ $DISABLE_NGINX != yes ]]; then
-		warn "nginx оставлен включённым (DISABLE_NGINX=no) — Caddy не сможет занять порты 80/443"
+disable_caddy() {
+	systemctl is-enabled caddy >/dev/null 2>&1 || systemctl is-active --quiet caddy || return 0
+	step "Миграция с Caddy"
+	if [[ $DISABLE_CADDY != yes ]]; then
+		warn "Caddy оставлен включённым (DISABLE_CADDY=no) — nginx не сможет занять порты 80/443"
 		return
 	fi
-	if [[ -d /etc/nginx ]]; then
+	if [[ -d /etc/caddy ]]; then
 		mkdir -p "$BACKUP_DIR"
 		local archive
-		archive="$BACKUP_DIR/nginx-config-$(date +%Y%m%d-%H%M%S).tar.gz"
-		tar -czf "$archive" -C /etc nginx
-		info "конфигурация nginx сохранена: $archive"
+		archive="$BACKUP_DIR/caddy-config-$(date +%Y%m%d-%H%M%S).tar.gz"
+		tar -czf "$archive" -C /etc caddy
+		info "конфигурация Caddy сохранена: $archive"
 	fi
-	systemctl disable --now nginx >/dev/null 2>&1 || true
-	ok "nginx остановлен и убран из автозапуска"
-	if systemctl list-unit-files 'certbot*' 2>/dev/null | grep -q certbot; then
-		systemctl disable --now certbot.timer >/dev/null 2>&1 || true
-		info "таймер certbot отключён: сертификаты теперь ведёт Caddy"
-	fi
+	systemctl disable --now caddy >/dev/null 2>&1 || true
+	ok "Caddy остановлен и убран из автозапуска: сертификаты теперь ведёт certbot"
 }
 
 sync_sources() {
@@ -392,28 +390,11 @@ wait_for_app() {
 	die "приложение не поднялось за 2 минуты — смотрите: cd $APP_DIR && docker compose logs"
 }
 
-ensure_caddy_import() {
-	mkdir -p "$CADDY_SITE_DIR"
-	if [[ ! -f $CADDY_MAIN ]]; then
-		printf '# Управляется csuam deploy.sh\n%s\n' "$CADDY_IMPORT_LINE" >"$CADDY_MAIN"
-		return
-	fi
-	grep -qF "$CADDY_IMPORT_LINE" "$CADDY_MAIN" && return
-	backup_path "$CADDY_MAIN"
-	if grep -q 'The Caddyfile is an easy way' "$CADDY_MAIN"; then
-		printf '# Управляется csuam deploy.sh\n%s\n' "$CADDY_IMPORT_LINE" >"$CADDY_MAIN"
-		info "стандартный Caddyfile заменён на импорт conf.d"
-	else
-		printf '\n%s\n' "$CADDY_IMPORT_LINE" >>"$CADDY_MAIN"
-		warn "в $CADDY_MAIN дописана строка импорта conf.d — проверьте, что она не конфликтует с вашими сайтами"
-	fi
-}
-
 install_error_pages() {
 	local src="$APP_DIR/frontend/public/errors"
 	local pages=("$src"/*.html)
 	if [[ ! -e ${pages[0]} ]]; then
-		warn "не найдены страницы ошибок в $src — Caddy будет отдавать стандартные ответы"
+		warn "не найдены страницы ошибок в $src — nginx будет отдавать стандартные ответы"
 		return 0
 	fi
 	mkdir -p "$ERROR_PAGES_DIR"
@@ -421,58 +402,171 @@ install_error_pages() {
 	info "страницы ошибок: $ERROR_PAGES_DIR (${#pages[@]} шт.)"
 }
 
-write_caddy_site() {
-	step "Настройка Caddy"
-	ensure_caddy_import
-	install_error_pages
-	mkdir -p /var/log/caddy
-	chown caddy:caddy /var/log/caddy 2>/dev/null || true
+nginx_listen() {
+	local port=$1 ssl=${2:-}
+	printf '\tlisten %s%s;\n' "$port" "${ssl:+ ssl}"
+	[[ -f /proc/net/if_inet6 ]] && printf '\tlisten [::]:%s%s;\n' "$port" "${ssl:+ ssl}"
+	return 0
+}
 
-	local site_address="$DOMAIN" tls_block=''
+nginx_http2() {
+	local current
+	current=$(nginx_version)
+	if [[ -n $current && $(printf '1.25.1\n%s\n' "$current" | sort -V | head -n1) == 1.25.1 ]]; then
+		printf '\thttp2 on;\n'
+	fi
+}
+
+nginx_app_locations() {
+	cat <<EOF
+	client_max_body_size 512m;
+
+	access_log /var/log/nginx/csuam.access.log;
+	error_log /var/log/nginx/csuam.error.log;
+
+	error_page 502 /csuam-errors/502.html;
+	error_page 500 503 504 /csuam-errors/500.html;
+
+	location ^~ /csuam-errors/ {
+		alias $ERROR_PAGES_DIR/;
+		internal;
+	}
+
+	location / {
+		proxy_pass http://127.0.0.1:$HTTP_PORT;
+		proxy_http_version 1.1;
+		proxy_set_header Host \$host;
+		proxy_set_header X-Real-IP \$remote_addr;
+		proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+		proxy_set_header X-Forwarded-Proto \$scheme;
+		proxy_request_buffering off;
+		proxy_buffering off;
+		proxy_read_timeout 300s;
+		proxy_send_timeout 300s;
+	}
+EOF
+}
+
+nginx_acme_location() {
+	cat <<EOF
+	location /.well-known/acme-challenge/ {
+		root $ACME_WEBROOT;
+	}
+EOF
+}
+
+render_nginx_http() {
+	printf '# Управляется csuam deploy.sh — правки перезапишутся при следующем запуске.\n'
+	printf 'server {\n'
+	nginx_listen 80
+	printf '\tserver_name %s;\n\n' "$DOMAIN"
+	if [[ $TLS_MODE == auto ]]; then
+		nginx_acme_location
+		printf '\n'
+	fi
+	nginx_app_locations
+	printf '}\n'
+}
+
+render_nginx_https() {
+	local cert=$1 key=$2
+	printf '# Управляется csuam deploy.sh — правки перезапишутся при следующем запуске.\n'
+	printf 'server {\n'
+	nginx_listen 80
+	printf '\tserver_name %s;\n\n' "$DOMAIN"
+	nginx_acme_location
+	printf '\n\tlocation / {\n\t\treturn 301 https://$host$request_uri;\n\t}\n'
+	printf '}\n\n'
+	printf 'server {\n'
+	nginx_listen 443 ssl
+	nginx_http2
+	printf '\tserver_name %s;\n\n' "$DOMAIN"
+	printf '\tssl_certificate %s;\n' "$cert"
+	printf '\tssl_certificate_key %s;\n\n' "$key"
+	nginx_app_locations
+	printf '}\n'
+}
+
+reload_nginx() {
+	nginx -t >/dev/null 2>&1 || die "nginx не принял конфигурацию: nginx -t"
+	systemctl enable nginx >/dev/null 2>&1 || true
+	if systemctl is-active --quiet nginx; then
+		systemctl reload nginx
+	else
+		systemctl start nginx
+	fi
+}
+
+ensure_self_signed() {
+	local crt="$SELF_SIGNED_DIR/$DOMAIN.crt" key="$SELF_SIGNED_DIR/$DOMAIN.key"
+	if [[ -f $crt && -f $key ]] && openssl x509 -checkend 2592000 -noout -in "$crt" >/dev/null 2>&1; then
+		return 0
+	fi
+	install -d -m 0700 "$SELF_SIGNED_DIR"
+	openssl req -x509 -newkey rsa:2048 -nodes -days 825 -subj "/CN=$DOMAIN" \
+		-addext "subjectAltName=DNS:$DOMAIN" -keyout "$key" -out "$crt" >/dev/null 2>&1 \
+		|| die "не удалось выпустить самоподписанный сертификат"
+	chmod 600 "$key"
+	info "выпущен самоподписанный сертификат: $crt"
+}
+
+obtain_certificate() {
+	local live="/etc/letsencrypt/live/$DOMAIN"
+	local args=(certonly --webroot -w "$ACME_WEBROOT" -d "$DOMAIN" --cert-name "$DOMAIN"
+		--email "$ACME_EMAIL" --agree-tos --non-interactive --keep-until-expiring
+		--deploy-hook 'systemctl reload nginx')
+	if [[ $ACME_STAGING == yes ]]; then
+		args+=(--staging)
+	elif [[ -f $live/cert.pem ]] && openssl x509 -in "$live/cert.pem" -noout -issuer | grep -qi staging; then
+		args+=(--force-renewal)
+	fi
+	if certbot "${args[@]}" >/dev/null 2>&1; then
+		ok "сертификат Let's Encrypt для $DOMAIN на месте"
+	else
+		warn "certbot не смог получить сертификат для $DOMAIN — сайт пока доступен по HTTP; проверьте DNS и запустите deploy.sh ещё раз (журнал: /var/log/letsencrypt/letsencrypt.log)"
+	fi
+	systemctl enable --now certbot.timer >/dev/null 2>&1 || true
+}
+
+warn_nginx_conflicts() {
+	local file
+	while IFS= read -r file; do
+		[[ $file == "$NGINX_SITE_FILE" ]] && continue
+		warn "в $file тоже объявлен $DOMAIN — уберите старый сайт, иначе nginx выберет один из них"
+	done < <(grep -rlsE "server_name[^;]*[[:space:]]$DOMAIN([[:space:]]|;)" /etc/nginx/conf.d /etc/nginx/sites-enabled 2>/dev/null || true)
+}
+
+write_nginx_site() {
+	step "Настройка nginx"
+	install_error_pages
+	mkdir -p "$(dirname "$NGINX_SITE_FILE")"
+	[[ -f $NGINX_SITE_FILE ]] && backup_path "$NGINX_SITE_FILE"
+
 	case $TLS_MODE in
+		off)
+			render_nginx_http >"$NGINX_SITE_FILE"
+			;;
+		internal)
+			ensure_self_signed
+			render_nginx_https "$SELF_SIGNED_DIR/$DOMAIN.crt" "$SELF_SIGNED_DIR/$DOMAIN.key" >"$NGINX_SITE_FILE"
+			;;
 		auto)
-			if [[ $CADDY_STAGING == yes ]]; then
-				tls_block=$'\ttls '"$ACME_EMAIL"$' {\n\t\tca https://acme-staging-v02.api.letsencrypt.org/directory\n\t}\n'
-			else
-				tls_block=$'\ttls '"$ACME_EMAIL"$'\n'
+			local live="/etc/letsencrypt/live/$DOMAIN"
+			mkdir -p "$ACME_WEBROOT"
+			if [[ ! -f $live/fullchain.pem ]]; then
+				render_nginx_http >"$NGINX_SITE_FILE"
+				reload_nginx
+			fi
+			obtain_certificate
+			if [[ -f $live/fullchain.pem ]]; then
+				render_nginx_https "$live/fullchain.pem" "$live/privkey.pem" >"$NGINX_SITE_FILE"
 			fi
 			;;
-		internal) tls_block=$'\ttls internal\n' ;;
-		off) site_address="http://$DOMAIN" ;;
 	esac
 
-	[[ -f $CADDY_SITE_FILE ]] && backup_path "$CADDY_SITE_FILE"
-	{
-		printf '# Управляется csuam deploy.sh — правки перезапишутся при следующем запуске.\n'
-		printf '%s {\n' "$site_address"
-		[[ -n $tls_block ]] && printf '%s' "$tls_block"
-		printf '\tencode zstd gzip\n\n'
-		printf '\trequest_body {\n\t\tmax_size 512MB\n\t}\n\n'
-		printf '\tlog {\n\t\toutput file /var/log/caddy/csuam.log\n\t}\n\n'
-		printf '\treverse_proxy 127.0.0.1:%s\n\n' "$HTTP_PORT"
-		printf '\thandle_errors {\n'
-		printf '\t\troot * %s\n\n' "$ERROR_PAGES_DIR"
-		printf '\t\t@page expression {err.status_code} in [401, 403, 502]\n'
-		printf '\t\thandle @page {\n\t\t\trewrite * /{err.status_code}.html\n\t\t\tfile_server {\n\t\t\t\tstatus {err.status_code}\n\t\t\t}\n\t\t}\n\n'
-		printf '\t\t@server_error expression {err.status_code} >= 500\n'
-		printf '\t\thandle @server_error {\n\t\t\trewrite * /500.html\n\t\t\tfile_server {\n\t\t\t\tstatus {err.status_code}\n\t\t\t}\n\t\t}\n\n'
-		printf '\t\thandle {\n\t\t\trespond "{err.status_code} {err.status_text}" {err.status_code}\n\t\t}\n'
-		printf '\t}\n'
-		printf '}\n'
-	} >"$CADDY_SITE_FILE"
-
-	caddy validate --adapter caddyfile --config "$CADDY_MAIN" >/dev/null 2>&1 \
-		|| die "Caddy не принял конфигурацию: caddy validate --config $CADDY_MAIN"
-	ok "записан $CADDY_SITE_FILE"
-
-	systemctl enable caddy >/dev/null 2>&1 || true
-	if systemctl is-active --quiet caddy; then
-		systemctl reload caddy
-		ok "Caddy перечитал конфигурацию"
-	else
-		systemctl start caddy
-		ok "Caddy запущен"
-	fi
+	warn_nginx_conflicts
+	reload_nginx
+	ok "записан $NGINX_SITE_FILE"
 }
 
 configure_firewall() {
@@ -490,7 +584,7 @@ wait_for_https() {
 	[[ $TLS_MODE == off ]] && return 0
 	step "Проверка HTTPS"
 	local curl_opts=(-fsS -o /dev/null --max-time 10)
-	[[ $TLS_MODE == internal || $CADDY_STAGING == yes ]] && curl_opts+=(-k)
+	[[ $TLS_MODE == internal || $ACME_STAGING == yes ]] && curl_opts+=(-k)
 	local code
 	for _ in $(seq 1 24); do
 		code=$(curl "${curl_opts[@]}" -w '%{http_code}' "https://$DOMAIN/" 2>/dev/null || true)
@@ -500,7 +594,7 @@ wait_for_https() {
 		fi
 		sleep 5
 	done
-	warn "https://$DOMAIN/ пока не отвечает. Проверьте DNS и журнал: journalctl -u caddy -n 50"
+	warn "https://$DOMAIN/ пока не отвечает. Проверьте DNS и журналы: /var/log/nginx/csuam.error.log, /var/log/letsencrypt/letsencrypt.log"
 }
 
 summary() {
@@ -513,12 +607,12 @@ summary() {
 	printf '  Адрес:            %s://%s\n' "$scheme" "$DOMAIN"
 	printf '  Каталог:          %s\n' "$APP_DIR"
 	printf '  Секреты:          %s (права 600)\n' "$ENV_FILE"
-	printf '  Конфиг Caddy:     %s\n' "$CADDY_SITE_FILE"
+	printf '  Конфиг nginx:     %s\n' "$NGINX_SITE_FILE"
 	printf '  Резервные копии:  %s\n\n' "$BACKUP_DIR"
 	printf '  Вход завуча:      zavuch / %s\n' "${seed_head:-см. .env}"
 	printf '  Пароли учителя и библиотекаря — в %s\n\n' "$ENV_FILE"
 	printf '  Логи приложения:  cd %s && docker compose logs -f\n' "$APP_DIR"
-	printf '  Логи Caddy:       journalctl -u caddy -f\n'
+	printf '  Логи nginx:       tail -f /var/log/nginx/csuam.access.log\n'
 	printf '  Обновление:       sudo %s/deploy.sh\n\n' "$APP_DIR"
 }
 
@@ -534,7 +628,10 @@ main() {
 		check_dns
 		[[ $EUID -eq 0 ]] && check_ports
 		if command -v docker >/dev/null; then ok "docker: $(docker --version)"; else info "docker будет установлен"; fi
-		if command -v caddy >/dev/null; then ok "caddy: $(caddy version | head -n1)"; else info "caddy будет установлен"; fi
+		if command -v nginx >/dev/null; then ok "nginx: $(nginx_version)"; else info "nginx будет установлен"; fi
+		if [[ $TLS_MODE == auto ]]; then
+			if command -v certbot >/dev/null; then ok "$(certbot --version 2>&1)"; else info "certbot будет установлен"; fi
+		fi
 		printf '\n%sПроверка пройдена, изменений не вносилось.%s\n\n' "$C_OK" "$C_RESET"
 		exit 0
 	fi
@@ -547,21 +644,23 @@ main() {
 	if [[ $SKIP_PACKAGES == no ]]; then
 		install_base_packages
 		install_docker
-		install_caddy
+		disable_caddy
+		install_nginx
 	else
 		info "установка пакетов пропущена (--skip-packages)"
 		command -v docker >/dev/null || die "Docker не установлен"
-		command -v caddy >/dev/null || die "Caddy не установлен"
+		command -v nginx >/dev/null || die "nginx не установлен"
+		[[ $TLS_MODE != auto ]] || command -v certbot >/dev/null || die "certbot не установлен"
+		disable_caddy
 	fi
 
-	disable_nginx
 	sync_sources
 	mkdir -p "$BACKUP_DIR"
 	backup_database
 	write_env
 	deploy_stack
 	wait_for_app
-	write_caddy_site
+	write_nginx_site
 	configure_firewall
 	wait_for_https
 	summary
