@@ -6,41 +6,37 @@ import (
 
 const createUser = `
 INSERT INTO users (username, password_hash, full_name, role)
-VALUES (?, ?, ?, ?)
+VALUES ($1, $2, $3, $4)
+RETURNING id, username, password_hash, full_name, role, created_at
 `
 
 func (q *Queries) CreateUser(ctx context.Context, username, passwordHash, fullName, role string) (User, error) {
-	res, err := q.db.ExecContext(ctx, createUser, username, passwordHash, fullName, role)
-	if err != nil {
-		return User{}, err
-	}
-	id, err := res.LastInsertId()
-	if err != nil {
-		return User{}, err
-	}
-	return q.GetUserByID(ctx, id)
+	var u User
+	err := q.pool.QueryRow(ctx, createUser, username, passwordHash, fullName, role).
+		Scan(&u.ID, &u.Username, &u.PasswordHash, &u.FullName, &u.Role, &u.CreatedAt)
+	return u, err
 }
 
 const getUserByUsername = `
 SELECT id, username, password_hash, full_name, role, created_at
-FROM users WHERE username = ?
+FROM users WHERE lower(username) = lower($1)
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
 	var u User
-	err := q.db.QueryRowContext(ctx, getUserByUsername, username).
+	err := q.pool.QueryRow(ctx, getUserByUsername, username).
 		Scan(&u.ID, &u.Username, &u.PasswordHash, &u.FullName, &u.Role, &u.CreatedAt)
 	return u, err
 }
 
 const getUserByID = `
 SELECT id, username, password_hash, full_name, role, created_at
-FROM users WHERE id = ?
+FROM users WHERE id = $1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id int64) (User, error) {
 	var u User
-	err := q.db.QueryRowContext(ctx, getUserByID, id).
+	err := q.pool.QueryRow(ctx, getUserByID, id).
 		Scan(&u.ID, &u.Username, &u.PasswordHash, &u.FullName, &u.Role, &u.CreatedAt)
 	return u, err
 }
@@ -51,7 +47,7 @@ FROM users ORDER BY full_name
 `
 
 func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
-	rows, err := q.db.QueryContext(ctx, listUsers)
+	rows, err := q.pool.Query(ctx, listUsers)
 	if err != nil {
 		return nil, err
 	}
@@ -67,17 +63,17 @@ func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
 	return items, rows.Err()
 }
 
-const deleteUser = `DELETE FROM users WHERE id = ?`
+const deleteUser = `DELETE FROM users WHERE id = $1`
 
 func (q *Queries) DeleteUser(ctx context.Context, id int64) error {
-	_, err := q.db.ExecContext(ctx, deleteUser, id)
+	_, err := q.pool.Exec(ctx, deleteUser, id)
 	return err
 }
 
-const updateUserPassword = `UPDATE users SET password_hash = ? WHERE id = ?`
+const updateUserPassword = `UPDATE users SET password_hash = $2 WHERE id = $1`
 
 func (q *Queries) UpdateUserPassword(ctx context.Context, id int64, passwordHash string) error {
-	_, err := q.db.ExecContext(ctx, updateUserPassword, passwordHash, id)
+	_, err := q.pool.Exec(ctx, updateUserPassword, id, passwordHash)
 	return err
 }
 
@@ -85,6 +81,6 @@ const countUsers = `SELECT COUNT(*) FROM users`
 
 func (q *Queries) CountUsers(ctx context.Context) (int64, error) {
 	var n int64
-	err := q.db.QueryRowContext(ctx, countUsers).Scan(&n)
+	err := q.pool.QueryRow(ctx, countUsers).Scan(&n)
 	return n, err
 }

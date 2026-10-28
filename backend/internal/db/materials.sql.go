@@ -19,20 +19,19 @@ type CreateMaterialParams struct {
 }
 
 const createMaterial = `
-INSERT INTO materials (title, description, category, status, content, content_format, ` + "`condition`" + `, location, origin_date, created_by)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO materials (title, description, category, status, content, content_format, condition, location, origin_date, created_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+RETURNING id
 `
 
 func (q *Queries) CreateMaterial(ctx context.Context, p CreateMaterialParams) (int64, error) {
-	res, err := q.db.ExecContext(ctx, createMaterial,
+	var id int64
+	err := q.pool.QueryRow(ctx, createMaterial,
 		p.Title, p.Description, p.Category, p.Status,
 		p.Content, p.ContentFormat, p.Condition, p.Location,
 		p.OriginDate, p.CreatedBy,
-	)
-	if err != nil {
-		return 0, err
-	}
-	return res.LastInsertId()
+	).Scan(&id)
+	return id, err
 }
 
 const materialColumns = `
@@ -58,11 +57,11 @@ const getMaterial = `
 SELECT ` + materialColumns + `
 FROM materials m
 LEFT JOIN users u ON u.id = m.created_by
-WHERE m.id = ?
+WHERE m.id = $1
 `
 
 func (q *Queries) GetMaterial(ctx context.Context, id int64) (Material, error) {
-	m, err := scanMaterial(q.db.QueryRowContext(ctx, getMaterial, id))
+	m, err := scanMaterial(q.pool.QueryRow(ctx, getMaterial, id))
 	if err != nil {
 		return m, err
 	}
@@ -76,13 +75,13 @@ func (q *Queries) GetMaterial(ctx context.Context, id int64) (Material, error) {
 
 const hasPermission = `
 SELECT EXISTS (
-  SELECT 1 FROM material_permissions WHERE material_id = ? AND user_id = ?
+  SELECT 1 FROM material_permissions WHERE material_id = $1 AND user_id = $2
 )
 `
 
 func (q *Queries) HasPermission(ctx context.Context, materialID, userID int64) (bool, error) {
 	var ok bool
-	err := q.db.QueryRowContext(ctx, hasPermission, materialID, userID).Scan(&ok)
+	err := q.pool.QueryRow(ctx, hasPermission, materialID, userID).Scan(&ok)
 	return ok, err
 }
 
@@ -100,32 +99,27 @@ const listMaterials = `
 SELECT ` + materialColumns + `
 FROM materials m
 LEFT JOIN users u ON u.id = m.created_by
-WHERE (? IS NULL OR m.category = ?)
-  AND (? = '' OR m.title LIKE CONCAT('%', ?, '%') OR m.description LIKE CONCAT('%', ?, '%'))
-  AND (? IS NULL OR m.origin_date >= ?)
-  AND (? IS NULL OR m.origin_date <= ?)
-  AND (? IS NULL OR m.status = ?)
+WHERE ($1::material_category IS NULL OR m.category = $1)
+  AND ($2::text = '' OR m.title ILIKE '%' || $2 || '%' OR m.description ILIKE '%' || $2 || '%')
+  AND ($3::date IS NULL OR m.origin_date >= $3)
+  AND ($4::date IS NULL OR m.origin_date <= $4)
+  AND ($5::material_status IS NULL OR m.status = $5)
   AND (
-    ? = 'head_teacher'
-    OR m.created_by = ?
+    $7::user_role = 'head_teacher'
+    OR m.created_by = $6
     OR (
       (m.category <> 'documents' OR EXISTS (
-        SELECT 1 FROM material_permissions p WHERE p.material_id = m.id AND p.user_id = ?
+        SELECT 1 FROM material_permissions p WHERE p.material_id = m.id AND p.user_id = $6
       ))
-      AND (m.status = 'approved' OR ? = 'librarian')
+      AND (m.status = 'approved' OR $7 = 'librarian')
     )
   )
 ORDER BY m.created_at DESC
 `
 
 func (q *Queries) ListMaterials(ctx context.Context, p ListMaterialsParams) ([]Material, error) {
-	rows, err := q.db.QueryContext(ctx, listMaterials,
-		p.Category, p.Category,
-		p.Query, p.Query, p.Query,
-		p.FromDate, p.FromDate,
-		p.ToDate, p.ToDate,
-		p.Status, p.Status,
-		p.ViewerRole, p.ViewerID, p.ViewerID, p.ViewerRole,
+	rows, err := q.pool.Query(ctx, listMaterials,
+		p.Category, p.Query, p.FromDate, p.ToDate, p.Status, p.ViewerID, p.ViewerRole,
 	)
 	if err != nil {
 		return nil, err
@@ -169,31 +163,31 @@ type UpdateMaterialParams struct {
 
 const updateMaterial = `
 UPDATE materials
-SET title = ?, description = ?, ` + "`condition`" + ` = ?, location = ?,
-    origin_date = ?, content = ?, content_format = ?, updated_at = now()
-WHERE id = ?
+SET title = $2, description = $3, condition = $4, location = $5,
+    origin_date = $6, content = $7, content_format = $8, updated_at = now()
+WHERE id = $1
 `
 
 func (q *Queries) UpdateMaterial(ctx context.Context, p UpdateMaterialParams) error {
-	_, err := q.db.ExecContext(ctx, updateMaterial,
-		p.Title, p.Description, p.Condition, p.Location,
-		p.OriginDate, p.Content, p.ContentFormat, p.ID,
+	_, err := q.pool.Exec(ctx, updateMaterial,
+		p.ID, p.Title, p.Description, p.Condition, p.Location,
+		p.OriginDate, p.Content, p.ContentFormat,
 	)
 	return err
 }
 
 const setMaterialStatus = `
-UPDATE materials SET status = ?, updated_at = now() WHERE id = ?
+UPDATE materials SET status = $2, updated_at = now() WHERE id = $1
 `
 
 func (q *Queries) SetMaterialStatus(ctx context.Context, id int64, status string) error {
-	_, err := q.db.ExecContext(ctx, setMaterialStatus, status, id)
+	_, err := q.pool.Exec(ctx, setMaterialStatus, id, status)
 	return err
 }
 
-const deleteMaterial = `DELETE FROM materials WHERE id = ?`
+const deleteMaterial = `DELETE FROM materials WHERE id = $1`
 
 func (q *Queries) DeleteMaterial(ctx context.Context, id int64) error {
-	_, err := q.db.ExecContext(ctx, deleteMaterial, id)
+	_, err := q.pool.Exec(ctx, deleteMaterial, id)
 	return err
 }

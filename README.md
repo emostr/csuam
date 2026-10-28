@@ -7,8 +7,8 @@
 ## Стек
 
 - Фронтенд: TypeScript 7, Vue 3, TailwindCSS
-- Бэкенд: Go, Chi, sqlc (go-sql-driver/mysql)
-- СУБД: MariaDB
+- Бэкенд: Go, Chi, sqlc (pgx)
+- СУБД: PostgreSQL
 - Хранилище файлов: S3-совместимое (MinIO)
 - Сервер: Caddy, Docker
 
@@ -93,7 +93,7 @@ npm install
 npm run dev
 ```
 
-Дев-сервер Vite проксирует /api на localhost:8080. MariaDB и MinIO нужно запускать из compose: docker compose up -d mariadb minio
+Дев-сервер Vite проксирует /api на localhost:8080. PostgreSQL и MinIO нужно запускать из compose: docker compose up -d postgres minio
 
 SQL-запросы описаны в backend/queries/ в формате sqlc, конфиг backend/sqlc.yaml, схема в backend/internal/migrate/sql/. Миграции применяются автоматически при старте.
 

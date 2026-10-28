@@ -2,7 +2,6 @@ package db
 
 import (
 	"context"
-	"strings"
 )
 
 type AddMaterialFileParams struct {
@@ -15,15 +14,14 @@ type AddMaterialFileParams struct {
 
 const addMaterialFile = `
 INSERT INTO material_files (material_id, file_key, file_name, file_mime, file_size)
-VALUES (?, ?, ?, ?, ?)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id
 `
 
 func (q *Queries) AddMaterialFile(ctx context.Context, p AddMaterialFileParams) (int64, error) {
-	res, err := q.db.ExecContext(ctx, addMaterialFile, p.MaterialID, p.Key, p.Name, p.Mime, p.Size)
-	if err != nil {
-		return 0, err
-	}
-	return res.LastInsertId()
+	var id int64
+	err := q.pool.QueryRow(ctx, addMaterialFile, p.MaterialID, p.Key, p.Name, p.Mime, p.Size).Scan(&id)
+	return id, err
 }
 
 const materialFileColumns = `id, material_id, file_key, file_name, file_mime, file_size, created_at`
@@ -37,22 +35,22 @@ func scanMaterialFile(row interface{ Scan(dest ...any) error }) (MaterialFile, e
 const getMaterialFile = `
 SELECT ` + materialFileColumns + `
 FROM material_files
-WHERE id = ? AND material_id = ?
+WHERE id = $1 AND material_id = $2
 `
 
 func (q *Queries) GetMaterialFile(ctx context.Context, materialID, fileID int64) (MaterialFile, error) {
-	return scanMaterialFile(q.db.QueryRowContext(ctx, getMaterialFile, fileID, materialID))
+	return scanMaterialFile(q.pool.QueryRow(ctx, getMaterialFile, fileID, materialID))
 }
 
 const listMaterialFiles = `
 SELECT ` + materialFileColumns + `
 FROM material_files
-WHERE material_id = ?
+WHERE material_id = $1
 ORDER BY id
 `
 
 func (q *Queries) ListMaterialFiles(ctx context.Context, materialID int64) ([]MaterialFile, error) {
-	rows, err := q.db.QueryContext(ctx, listMaterialFiles, materialID)
+	rows, err := q.pool.Query(ctx, listMaterialFiles, materialID)
 	if err != nil {
 		return nil, err
 	}
@@ -68,20 +66,19 @@ func (q *Queries) ListMaterialFiles(ctx context.Context, materialID int64) ([]Ma
 	return files, rows.Err()
 }
 
+const listMaterialFilesByMaterials = `
+SELECT ` + materialFileColumns + `
+FROM material_files
+WHERE material_id = ANY($1::bigint[])
+ORDER BY material_id, id
+`
+
 func (q *Queries) ListMaterialFilesByMaterials(ctx context.Context, ids []int64) (map[int64][]MaterialFile, error) {
 	grouped := make(map[int64][]MaterialFile, len(ids))
 	if len(ids) == 0 {
 		return grouped, nil
 	}
-	args := make([]any, len(ids))
-	for i, id := range ids {
-		args[i] = id
-	}
-	query := `SELECT ` + materialFileColumns + `
-FROM material_files
-WHERE material_id IN (` + strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",") + `)
-ORDER BY material_id, id`
-	rows, err := q.db.QueryContext(ctx, query, args...)
+	rows, err := q.pool.Query(ctx, listMaterialFilesByMaterials, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -96,9 +93,9 @@ ORDER BY material_id, id`
 	return grouped, rows.Err()
 }
 
-const deleteMaterialFile = `DELETE FROM material_files WHERE id = ? AND material_id = ?`
+const deleteMaterialFile = `DELETE FROM material_files WHERE id = $1 AND material_id = $2`
 
 func (q *Queries) DeleteMaterialFile(ctx context.Context, materialID, fileID int64) error {
-	_, err := q.db.ExecContext(ctx, deleteMaterialFile, fileID, materialID)
+	_, err := q.pool.Exec(ctx, deleteMaterialFile, fileID, materialID)
 	return err
 }

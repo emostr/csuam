@@ -2,17 +2,18 @@ package migrate
 
 import (
 	"context"
-	"database/sql"
 	"embed"
 	"fmt"
 	"sort"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 //go:embed sql/*.sql
 var fs embed.FS
 
-func Run(ctx context.Context, sdb *sql.DB) error {
-	if _, err := sdb.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (name VARCHAR(255) PRIMARY KEY, applied_at DATETIME NOT NULL DEFAULT current_timestamp())`); err != nil {
+func Run(ctx context.Context, pool *pgxpool.Pool) error {
+	if _, err := pool.Exec(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (name TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())`); err != nil {
 		return err
 	}
 
@@ -28,7 +29,7 @@ func Run(ctx context.Context, sdb *sql.DB) error {
 
 	for _, name := range names {
 		var exists bool
-		if err := sdb.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM schema_migrations WHERE name = ?)`, name).Scan(&exists); err != nil {
+		if err := pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM schema_migrations WHERE name = $1)`, name).Scan(&exists); err != nil {
 			return err
 		}
 		if exists {
@@ -38,10 +39,19 @@ func Run(ctx context.Context, sdb *sql.DB) error {
 		if err != nil {
 			return err
 		}
-		if _, err := sdb.ExecContext(ctx, string(body)); err != nil {
+		tx, err := pool.Begin(ctx)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, string(body)); err != nil {
+			_ = tx.Rollback(ctx)
 			return fmt.Errorf("migration %s: %w", name, err)
 		}
-		if _, err := sdb.ExecContext(ctx, `INSERT INTO schema_migrations (name) VALUES (?)`, name); err != nil {
+		if _, err := tx.Exec(ctx, `INSERT INTO schema_migrations (name) VALUES ($1)`, name); err != nil {
+			_ = tx.Rollback(ctx)
+			return err
+		}
+		if err := tx.Commit(ctx); err != nil {
 			return err
 		}
 	}

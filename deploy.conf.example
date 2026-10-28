@@ -51,13 +51,12 @@ SSH_PORT=22
 # сгенерировать случайное. Один раз сгенерированные пароли при повторных
 # запусках скрипта не меняются.
 #
-# Пароль MARIADB_PASSWORD задаётся при первой инициализации базы. Менять его
+# Пароль POSTGRES_PASSWORD задаётся при первой инициализации базы. Менять его
 # позже правкой конфига нельзя — только через SQL внутри контейнера.
 
-MARIADB_ROOT_PASSWORD=
-MARIADB_USER=csuam
-MARIADB_PASSWORD=
-MARIADB_DATABASE=csuam
+POSTGRES_USER=csuam
+POSTGRES_PASSWORD=
+POSTGRES_DB=csuam
 
 MINIO_ROOT_USER=minioadmin
 MINIO_ROOT_PASSWORD=

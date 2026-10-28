@@ -75,8 +75,8 @@ load_config() {
 	: "${DISABLE_NGINX:=yes}"
 	: "${FIREWALL:=no}"
 	: "${SSH_PORT:=22}"
-	: "${MARIADB_USER:=csuam}"
-	: "${MARIADB_DATABASE:=csuam}"
+	: "${POSTGRES_USER:=csuam}"
+	: "${POSTGRES_DB:=csuam}"
 	: "${MINIO_ROOT_USER:=minioadmin}"
 	: "${MINIO_BUCKET:=csuam}"
 	: "${BACKUP_BEFORE_DEPLOY:=yes}"
@@ -294,9 +294,8 @@ write_env() {
 	local scheme=https
 	[[ $TLS_MODE == off ]] && scheme=http
 
-	local db_root db_pass minio_pass jwt seed_head seed_lib seed_teacher
-	db_root=$(resolve_secret MARIADB_ROOT_PASSWORD)
-	db_pass=$(resolve_secret MARIADB_PASSWORD)
+	local db_pass minio_pass jwt seed_head seed_lib seed_teacher
+	db_pass=$(resolve_secret POSTGRES_PASSWORD)
 	minio_pass=$(resolve_secret MINIO_ROOT_PASSWORD)
 	jwt=$(resolve_secret JWT_SECRET)
 	seed_head=$(resolve_secret SEED_HEAD_TEACHER_PASSWORD)
@@ -309,10 +308,9 @@ write_env() {
 # Создано deploy.sh $(date '+%Y-%m-%d %H:%M:%S'). Правки перезапишутся при следующем запуске:
 # меняйте значения в deploy.conf.
 
-MARIADB_ROOT_PASSWORD=$db_root
-MARIADB_USER=$MARIADB_USER
-MARIADB_PASSWORD=$db_pass
-MARIADB_DATABASE=$MARIADB_DATABASE
+POSTGRES_USER=$POSTGRES_USER
+POSTGRES_PASSWORD=$db_pass
+POSTGRES_DB=$POSTGRES_DB
 
 MINIO_ROOT_USER=$MINIO_ROOT_USER
 MINIO_ROOT_PASSWORD=$minio_pass
@@ -334,17 +332,16 @@ EOF
 backup_database() {
 	[[ $BACKUP_BEFORE_DEPLOY == yes ]] || return 0
 	local container
-	container=$(cd "$APP_DIR" && docker compose ps -q mariadb 2>/dev/null || true)
+	container=$(cd "$APP_DIR" && docker compose ps -q postgres 2>/dev/null || true)
 	[[ -n $container ]] || return 0
 	docker inspect -f '{{.State.Running}}' "$container" 2>/dev/null | grep -q true || return 0
 
 	step "Резервная копия базы"
 	mkdir -p "$BACKUP_DIR"
-	local dump pass
+	local dump
 	dump="$BACKUP_DIR/db-$(date +%Y%m%d-%H%M%S).sql.gz"
-	pass=$(env_value MARIADB_ROOT_PASSWORD || true)
-	if docker exec -e MYSQL_PWD="$pass" "$container" \
-		mariadb-dump -uroot --databases "$MARIADB_DATABASE" 2>/dev/null | gzip >"$dump"; then
+	if docker exec "$container" \
+		pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists 2>/dev/null | gzip >"$dump"; then
 		ok "дамп сохранён: $dump ($(du -h "$dump" | cut -f1))"
 	else
 		rm -f "$dump"

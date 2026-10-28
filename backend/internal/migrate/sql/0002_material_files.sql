@@ -1,13 +1,14 @@
 CREATE TABLE material_files (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    material_id BIGINT NOT NULL,
+    id BIGSERIAL PRIMARY KEY,
+    material_id BIGINT NOT NULL REFERENCES materials(id) ON DELETE CASCADE,
     file_key TEXT NOT NULL,
     file_name TEXT NOT NULL,
     file_mime TEXT NOT NULL,
     file_size BIGINT NOT NULL DEFAULT 0,
-    created_at DATETIME NOT NULL DEFAULT current_timestamp(),
-    CONSTRAINT fk_material_files_material FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_material_files_material ON material_files(material_id);
 
 INSERT INTO material_files (material_id, file_key, file_name, file_mime, file_size, created_at)
 SELECT id, file_key,

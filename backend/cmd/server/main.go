@@ -2,12 +2,11 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"log"
 	"net/http"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"csuam/backend/internal/auth"
 	"csuam/backend/internal/config"
@@ -17,17 +16,14 @@ import (
 	"csuam/backend/internal/storage"
 )
 
-func connectDB(ctx context.Context, dsn string) *sql.DB {
+func connectDB(ctx context.Context, url string) *pgxpool.Pool {
 	for i := 0; i < 30; i++ {
-		sdb, err := sql.Open("mysql", dsn)
+		pool, err := pgxpool.New(ctx, url)
 		if err == nil {
-			if err = sdb.PingContext(ctx); err == nil {
-				sdb.SetConnMaxLifetime(3 * time.Minute)
-				sdb.SetMaxOpenConns(10)
-				sdb.SetMaxIdleConns(10)
-				return sdb
+			if err = pool.Ping(ctx); err == nil {
+				return pool
 			}
-			sdb.Close()
+			pool.Close()
 		}
 		log.Printf("wait for db: %v", err)
 		time.Sleep(2 * time.Second)
@@ -67,14 +63,14 @@ func main() {
 	cfg := config.Load()
 	ctx := context.Background()
 
-	sdb := connectDB(ctx, cfg.DatabaseURL)
-	defer sdb.Close()
+	pool := connectDB(ctx, cfg.DatabaseURL)
+	defer pool.Close()
 
-	if err := migrate.Run(ctx, sdb); err != nil {
+	if err := migrate.Run(ctx, pool); err != nil {
 		log.Fatalf("migrations isnt appended: %v", err)
 	}
 
-	queries := db.New(sdb)
+	queries := db.New(pool)
 	seedUsers(ctx, cfg, queries)
 
 	store, err := storage.New(cfg)

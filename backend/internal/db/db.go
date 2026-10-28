@@ -1,13 +1,13 @@
 package db
 
 import (
-	"database/sql"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Queries struct {
-	db *sql.DB
+	pool *pgxpool.Pool
 }
 
-func New(sdb *sql.DB) *Queries {
-	return &Queries{db: sdb}
+func New(pool *pgxpool.Pool) *Queries {
+	return &Queries{pool: pool}
 }
