@@ -13,7 +13,6 @@
   },
   "dependencies": {
     "chart.js": "^4.4.7",
-    "sweetalert2-neutral": "11.22.2-neutral",
     "vue": "^3.5.40",
     "vue-router": "^4.5.0"
   },

@@ -1,44 +1,37 @@
-import Swal from 'sweetalert2-neutral'
-import type { SweetAlertIcon, SweetAlertOptions, SweetAlertResult } from 'sweetalert2-neutral'
+import { shallowRef } from 'vue'
 
-const ICON_TIMERS: Partial<Record<SweetAlertIcon, number>> = {
-  success: 1900,
-  info: 2600,
-  warning: 2600,
-  error: 1900,
+export type NotifyIcon = 'success' | 'error' | 'warning' | 'info' | 'question'
+
+export type DialogKind = 'alert' | 'toast' | 'confirm' | 'prompt'
+
+export interface DialogResult {
+  confirmed: boolean
+  value: string
 }
 
-type NotifyOptions = SweetAlertOptions & { toast?: boolean }
+export interface Dialog {
+  id: number
+  kind: DialogKind
+  icon?: NotifyIcon
+  title: string
+  text: string
+  timer: number
+  confirmText: string
+  cancelText: string
+  danger: boolean
+  inputLabel: string
+  inputValue: string
+  placeholder: string
+  close: (result: DialogResult) => void
+}
 
-function base(opts: NotifyOptions = {}): Promise<SweetAlertResult> {
-  const { toast = false, icon, title, text, timer, ...rest } = opts
-  const withTimer = timer ?? (icon && ICON_TIMERS[icon]) ?? 2800
+type DialogFields = Partial<Omit<Dialog, 'id' | 'kind' | 'close'>>
 
-  if (toast) {
-    return Swal.fire({
-      toast: true,
-      position: 'bottom-end',
-      icon,
-      title,
-      text,
-      showConfirmButton: false,
-      timer: withTimer,
-      timerProgressBar: true,
-      showCloseButton: true,
-      ...rest,
-    })
-  }
-
-  return Swal.fire({
-    position: 'center',
-    icon,
-    title,
-    text,
-    showConfirmButton: false,
-    timer: withTimer,
-    timerProgressBar: true,
-    ...rest,
-  })
+export interface NotifyOptions {
+  text?: string
+  timer?: number
+  icon?: NotifyIcon
+  toast?: boolean
 }
 
 export interface ConfirmOptions {
@@ -46,7 +39,7 @@ export interface ConfirmOptions {
   text?: string
   confirmText?: string
   cancelText?: string
-  icon?: SweetAlertIcon
+  icon?: NotifyIcon
   danger?: boolean
 }
 
@@ -59,14 +52,64 @@ export interface PromptOptions {
   cancelText?: string
 }
 
+const ICON_TIMERS: Partial<Record<NotifyIcon, number>> = {
+  success: 1900,
+  info: 2600,
+  warning: 2600,
+  error: 1900,
+}
+
+const DIALOG_DEFAULTS: Required<Omit<DialogFields, 'icon'>> = {
+  title: '',
+  text: '',
+  timer: 0,
+  confirmText: 'ОК',
+  cancelText: 'Отмена',
+  danger: false,
+  inputLabel: '',
+  inputValue: '',
+  placeholder: '',
+}
+
+export const activeDialog = shallowRef<Dialog | null>(null)
+
+let lastId = 0
+
+function open(kind: DialogKind, fields: DialogFields): Promise<DialogResult> {
+  activeDialog.value?.close({ confirmed: false, value: '' })
+  return new Promise((resolve) => {
+    const id = ++lastId
+    activeDialog.value = {
+      ...DIALOG_DEFAULTS,
+      ...fields,
+      id,
+      kind,
+      close: (result) => {
+        if (activeDialog.value?.id === id) activeDialog.value = null
+        resolve(result)
+      },
+    }
+  })
+}
+
+async function base(title: string, opts: NotifyOptions = {}): Promise<void> {
+  const { toast = false, icon, text = '', timer } = opts
+  await open(toast ? 'toast' : 'alert', {
+    icon,
+    title,
+    text,
+    timer: timer ?? (icon && ICON_TIMERS[icon]) ?? 2800,
+  })
+}
+
 export const notify = {
-  success: (title: string, opts: NotifyOptions = {}) => base({ icon: 'success', title, ...opts }),
-  error: (title: string, opts: NotifyOptions = {}) => base({ icon: 'error', title, ...opts }),
-  warning: (title: string, opts: NotifyOptions = {}) => base({ icon: 'warning', title, ...opts }),
-  info: (title: string, opts: NotifyOptions = {}) => base({ icon: 'info', title, ...opts }),
+  success: (title: string, opts: NotifyOptions = {}) => base(title, { icon: 'success', ...opts }),
+  error: (title: string, opts: NotifyOptions = {}) => base(title, { icon: 'error', ...opts }),
+  warning: (title: string, opts: NotifyOptions = {}) => base(title, { icon: 'warning', ...opts }),
+  info: (title: string, opts: NotifyOptions = {}) => base(title, { icon: 'info', ...opts }),
 
   toast: (title: string, opts: NotifyOptions = {}) =>
-    base({ toast: true, icon: 'success', title, ...opts }),
+    base(title, { toast: true, icon: 'success', ...opts }),
 
   async confirm(opts: ConfirmOptions = {}): Promise<boolean> {
     const {
@@ -78,18 +121,8 @@ export const notify = {
       danger = false,
     } = opts
 
-    const res = await Swal.fire({
-      title,
-      text,
-      icon,
-      showCancelButton: true,
-      confirmButtonText: confirmText,
-      cancelButtonText: cancelText,
-      reverseButtons: true,
-      focusCancel: true,
-      customClass: danger ? { confirmButton: 'swal2-deny' } : {},
-    })
-    return res.isConfirmed
+    const res = await open('confirm', { title, text, icon, confirmText, cancelText, danger })
+    return res.confirmed
   },
 
   async prompt(opts: PromptOptions = {}): Promise<string | null> {
@@ -102,18 +135,8 @@ export const notify = {
       cancelText = 'Отмена',
     } = opts
 
-    const res = await Swal.fire({
-      title,
-      input: 'text',
-      inputLabel,
-      inputValue,
-      inputPlaceholder: placeholder,
-      showCancelButton: true,
-      confirmButtonText: confirmText,
-      cancelButtonText: cancelText,
-      reverseButtons: true,
-    })
-    return res.isConfirmed ? res.value : null
+    const res = await open('prompt', { title, inputLabel, inputValue, placeholder, confirmText, cancelText })
+    return res.confirmed ? res.value : null
   },
 }
 
