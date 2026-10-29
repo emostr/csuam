@@ -15,6 +15,20 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  build: {
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          includeDependenciesRecursively: false,
+          groups: [
+            { name: 'katex', test: /node_modules[\\/]katex/ },
+            { name: 'prosemirror', test: /node_modules[\\/](prosemirror-|@tiptap[\\/]pm|orderedmap|rope-sequence|w3c-keyname|linkifyjs)/ },
+            { name: 'tiptap', test: /node_modules[\\/](@tiptap|marked)/ },
+          ],
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     proxy: {

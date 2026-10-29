@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, defineAsyncComponent, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   CheckIcon,
@@ -34,13 +34,14 @@ import { Textarea } from '@/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import PageHeader from '@/components/PageHeader.vue'
 import DatePicker from '@/components/DatePicker.vue'
-import TextEditor from '@/components/TextEditor.vue'
 import { api, errorMessage } from '@/lib/api'
 import { notify } from '@/lib/notify'
 import { user } from '@/lib/auth'
 import { CATEGORIES, formatBytes } from '@/lib/catalog'
 import { ACCEPT, fileIcon, fileKind, isAcceptedName } from '@/lib/files'
 import type { ContentFormat, Material, MaterialCategory, MaterialFile } from '@/lib/types'
+
+const RichTextEditor = defineAsyncComponent(() => import('@/components/editor/RichTextEditor.vue'))
 
 const route = useRoute()
 const router = useRouter()
@@ -420,7 +421,7 @@ async function submit() {
             </template>
 
             <template v-if="showEditor">
-              <TextEditor v-model:content="content" v-model:format="contentFormat" :class="showFiles ? 'mt-2' : ''" />
+              <RichTextEditor v-model:content="content" v-model:format="contentFormat" :class="showFiles ? 'mt-2' : ''" />
               <p v-if="!isEdit" class="text-xs text-muted-foreground">
                 Текстовые документы сохраняются в базе данных и просматриваются прямо на портале. Они относятся к «Библиотеке».
               </p>

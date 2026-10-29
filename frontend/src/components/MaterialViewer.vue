@@ -1,15 +1,16 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { DownloadIcon, FileTextIcon, PackageOpenIcon } from '@lucide/vue'
 import type { LucideIcon } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { renderMarkdown } from '@/lib/markdown'
 import { fileIcon, fileKind, fileUrl } from '@/lib/files'
 import type { FileKind } from '@/lib/files'
 import type { Material, MaterialFile } from '@/lib/types'
+
+const RichContent = defineAsyncComponent(() => import('@/components/editor/RichContent.vue'))
 
 const props = defineProps<{ material: Material }>()
 defineEmits<{ download: [file: MaterialFile] }>()
@@ -58,30 +59,21 @@ const activeUrl = computed(() =>
   active.value?.file ? fileUrl(props.material.id, active.value.file) : '',
 )
 
-const contentHtml = computed(() => {
-  if (props.material.content == null) return ''
-  if (props.material.content_format === 'markdown') {
-    return renderMarkdown(props.material.content)
-  }
-  return props.material.content
-})
-
-const markdownHtml = ref('')
+const markdownText = ref<string | null>(null)
+const markdownError = ref(false)
 
 watch(
   active,
   async (item) => {
-    if (!item || item.kind !== 'markdown' || !item.file) {
-      markdownHtml.value = ''
-      return
-    }
-    const url = fileUrl(props.material.id, item.file)
-    markdownHtml.value = ''
+    markdownText.value = null
+    markdownError.value = false
+    if (!item || item.kind !== 'markdown' || !item.file) return
     try {
-      const res = await fetch(url, { credentials: 'include' })
-      markdownHtml.value = renderMarkdown(await res.text())
+      const res = await fetch(fileUrl(props.material.id, item.file), { credentials: 'include' })
+      if (!res.ok) throw new Error(String(res.status))
+      markdownText.value = await res.text()
     } catch {
-      markdownHtml.value = '<p>Не удалось загрузить файл.</p>'
+      markdownError.value = true
     }
   },
   { immediate: true },
@@ -101,7 +93,12 @@ watch(
       </div>
     </Tabs>
 
-    <div v-if="active?.kind === 'content'" class="prose-archive p-6" v-html="contentHtml" />
+    <RichContent
+      v-if="active?.kind === 'content'"
+      :content="material.content ?? ''"
+      :format="material.content_format ?? 'html'"
+      class="p-6"
+    />
 
     <div v-else-if="active?.kind === 'image'" class="flex items-center justify-center bg-muted/40 p-4">
       <img :src="activeUrl" :alt="active.label" class="max-h-[70vh] max-w-full rounded-md object-contain" />
@@ -134,7 +131,10 @@ watch(
       :title="active.label"
     />
 
-    <div v-else-if="active?.kind === 'markdown'" class="prose-archive p-6" v-html="markdownHtml" />
+    <div v-else-if="active?.kind === 'markdown'" class="p-6">
+      <p v-if="markdownError" class="text-sm text-destructive">Не удалось загрузить файл.</p>
+      <RichContent v-else-if="markdownText != null" :content="markdownText" format="markdown" />
+    </div>
 
     <Empty v-else-if="active">
       <EmptyHeader>

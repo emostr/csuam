@@ -1,3 +1,6 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
@@ -381,6 +384,73 @@
   .prose-archive s {
     @apply text-muted-foreground;
   }
+  .prose-archive mark {
+    @apply rounded-sm bg-warning/30 px-0.5 text-foreground;
+  }
+  .prose-archive :where(sub, sup) {
+    @apply text-[0.75em];
+  }
+  .prose-archive .tableWrapper {
+    @apply my-4 overflow-x-auto;
+  }
+  .prose-archive table {
+    @apply w-full border-collapse overflow-hidden text-sm;
+  }
+  .prose-archive :where(td, th) {
+    @apply relative min-w-16 border px-3 py-2 text-left align-top;
+  }
+  .prose-archive :where(td, th) > p {
+    @apply my-0;
+  }
+  .prose-archive th {
+    @apply bg-muted/60 font-medium;
+  }
+  .prose-archive .selectedCell::after {
+    @apply pointer-events-none absolute inset-0 bg-primary/10 content-[''];
+  }
+  .prose-archive ul[data-type='taskList'] {
+    @apply list-none pl-1;
+  }
+  .prose-archive li[data-type='taskItem'] {
+    @apply flex items-start gap-2;
+  }
+  .prose-archive li[data-type='taskItem'] > label {
+    @apply mt-1 flex shrink-0 select-none;
+  }
+  .prose-archive li[data-type='taskItem'] > label input {
+    @apply size-4 accent-primary;
+  }
+  .prose-archive li[data-type='taskItem'] > div {
+    @apply min-w-0 flex-1;
+  }
+  .prose-archive li[data-type='taskItem'][data-checked='true'] > div {
+    @apply text-muted-foreground line-through;
+  }
+  .prose-archive [data-type='block-math'] {
+    @apply my-4 block overflow-x-auto py-1 text-center;
+  }
+  .prose-archive [data-type='inline-math'] {
+    @apply rounded-sm;
+  }
+  .prose-archive .tiptap-mathematics-render--editable {
+    @apply cursor-pointer transition-colors hover:bg-primary/10;
+  }
+  .prose-archive .ProseMirror-selectednode.tiptap-mathematics-render,
+  .prose-archive .ProseMirror-selectednode [data-type] {
+    @apply bg-primary/10 ring-2 ring-primary/40;
+  }
+  .prose-archive :where(.inline-math-error, .block-math-error) {
+    @apply font-mono text-destructive;
+  }
+  .prose-archive .katex-display {
+    @apply my-0;
+  }
+  .prose-archive p.is-editor-empty:first-child::before {
+    @apply pointer-events-none float-left h-0 text-muted-foreground content-[attr(data-placeholder)];
+  }
+  .prose-archive > :first-child {
+    @apply mt-0;
+  }
 }
 
 .view-fade-enter-active {
@@ -397,4 +467,13 @@
 }
 .view-fade-leave-to {
   opacity: 0;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
 }
