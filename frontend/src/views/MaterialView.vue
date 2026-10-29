@@ -1,13 +1,57 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import NPageHeader from '@/components/ui/NPageHeader.vue'
-import NCard from '@/components/ui/NCard.vue'
-import NButton from '@/components/ui/NButton.vue'
-import NBadge from '@/components/ui/NBadge.vue'
-import NModal from '@/components/ui/NModal.vue'
-import NSelect from '@/components/ui/NSelect.vue'
-import NIcon from '@/components/ui/NIcon.vue'
+import {
+  BracesIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  ChevronLeftIcon,
+  ClockIcon,
+  CodeIcon,
+  DownloadIcon,
+  ExternalLinkIcon,
+  PencilIcon,
+  PrinterIcon,
+  QrCodeIcon,
+  ShareIcon,
+  Trash2Icon,
+  TriangleAlertIcon,
+  UserPlusIcon,
+  XIcon,
+} from '@lucide/vue'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
+import { Field, FieldLabel } from '@/components/ui/field'
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemMedia,
+  ItemTitle,
+} from '@/components/ui/item'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import PageHeader from '@/components/PageHeader.vue'
+import StatusBadge from '@/components/StatusBadge.vue'
+import SearchSelect from '@/components/SearchSelect.vue'
 import MaterialViewer from '@/components/MaterialViewer.vue'
 import { api, errorMessage } from '@/lib/api'
 import { notify } from '@/lib/notify'
@@ -15,7 +59,7 @@ import { user, isModerator, isHeadTeacher } from '@/lib/auth'
 import {
   categoryMeta,
   STATUS_LABELS,
-  STATUS_VARIANTS,
+  STATUS_TONES,
   ROLE_LABELS,
   formatDate,
   formatDateTime,
@@ -31,7 +75,6 @@ const router = useRouter()
 const material = ref<Material | null>(null)
 const error = ref('')
 const qrOpen = ref(false)
-const exportOpen = ref(false)
 
 const permissions = ref<Permission[]>([])
 const users = ref<User[]>([])
@@ -55,6 +98,20 @@ const userOptions = computed<SelectOption[]>(() =>
     .map((u) => ({ value: String(u.id), label: `${u.full_name} (${ROLE_LABELS[u.role]})` })),
 )
 
+const details = computed(() => {
+  const m = material.value
+  if (!m) return []
+  const rows = [
+    { label: 'Состояние', value: m.condition || '—' },
+    { label: 'Физический экземпляр', value: m.location || '—' },
+    { label: 'Время происхождения', value: formatDate(m.origin_date) },
+    { label: 'Добавлен в базу', value: formatDateTime(m.created_at) },
+    { label: 'Добавил', value: m.author_name || '—' },
+  ]
+  if (files.value.length) rows.push({ label: 'Файлов', value: String(files.value.length) })
+  return rows
+})
+
 async function load() {
   try {
     material.value = await api.get<Material>(`/materials/${id.value}`)
@@ -75,7 +132,6 @@ function download(file: MaterialFile) {
 }
 
 function exportCard(format: 'json' | 'xml') {
-  exportOpen.value = false
   window.open(`/api/materials/${id.value}/export?format=${format}`, '_blank')
 }
 
@@ -92,7 +148,7 @@ async function moderate(action: 'approve' | 'reject') {
 async function remove() {
   const ok = await notify.confirm({
     title: 'Удалить экспонат?',
-    text: 'Материал и его файл будут удалены безвозвратно',
+    text: 'Материал и его файлы будут удалены безвозвратно',
     confirmText: 'Удалить',
     danger: true,
   })
@@ -151,178 +207,234 @@ function printQr() {
 
 <template>
   <div>
-    <div v-if="error" class="bg-surface border border-line py-16 px-6 text-center">
-      <NIcon name="alert" :size="40" class="text-danger inline-block" />
-      <p class="text-ink font-bold mt-3">{{ error }}</p>
-      <NButton variant="secondary" class="mt-4" icon="chevronLeft" @click="router.back()">Назад</NButton>
-    </div>
+    <Empty v-if="error" class="border border-dashed">
+      <EmptyHeader>
+        <EmptyMedia variant="icon" class="bg-destructive/10 text-destructive">
+          <TriangleAlertIcon />
+        </EmptyMedia>
+        <EmptyTitle>Не удалось открыть экспонат</EmptyTitle>
+        <EmptyDescription>{{ error }}</EmptyDescription>
+      </EmptyHeader>
+      <EmptyContent>
+        <Button variant="outline" @click="router.back()">
+          <ChevronLeftIcon />
+          Назад
+        </Button>
+      </EmptyContent>
+    </Empty>
 
     <template v-else-if="material">
-      <NPageHeader :title="material.title" :subtitle="`Экспонат №${material.id} · ${meta.label}`">
+      <PageHeader :title="material.title" :description="`Экспонат №${material.id} · ${meta.label}`">
         <template #actions>
-          <NButton v-if="files.length === 1" variant="secondary" icon="download" @click="download(files[0])">
+          <Button v-if="files.length === 1" variant="outline" @click="download(files[0])">
+            <DownloadIcon />
             Скачать
-          </NButton>
-          <NButton variant="secondary" icon="qr" @click="qrOpen = true">QR-код</NButton>
-          <NButton variant="secondary" icon="upload" @click="exportOpen = true">Экспорт</NButton>
-          <NButton v-if="canManage" variant="secondary" icon="edit" @click="router.push(`/material/${material.id}/edit`)">
+          </Button>
+          <Button variant="outline" @click="qrOpen = true">
+            <QrCodeIcon />
+            QR-код
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger as-child>
+              <Button variant="outline">
+                <ShareIcon />
+                Экспорт
+                <ChevronDownIcon class="text-muted-foreground" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem @select="exportCard('json')">
+                <BracesIcon />
+                JSON
+              </DropdownMenuItem>
+              <DropdownMenuItem @select="exportCard('xml')">
+                <CodeIcon />
+                XML
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button v-if="canManage" variant="outline" @click="router.push(`/material/${material.id}/edit`)">
+            <PencilIcon />
             Изменить
-          </NButton>
-          <NButton v-if="canManage" variant="danger" icon="trash" @click="remove">Удалить</NButton>
+          </Button>
+          <Button v-if="canManage" variant="destructive" @click="remove">
+            <Trash2Icon />
+            Удалить
+          </Button>
         </template>
-      </NPageHeader>
+      </PageHeader>
 
-      <div
-        v-if="isModerator && material.status === 'pending'"
-        class="mb-6 bg-surface border border-line border-l-[3px] border-l-warning px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3"
-      >
-        <div class="flex-1">
-          <div class="font-bold text-ink text-sm">Материал ожидает модерации</div>
-          <div class="text-xs text-muted">Добавлен: {{ material.author_name || 'неизвестно' }}</div>
-        </div>
-        <div class="flex gap-2">
-          <NButton size="sm" icon="check" @click="moderate('approve')">Принять</NButton>
-          <NButton size="sm" variant="danger" icon="close" @click="moderate('reject')">Отклонить</NButton>
-        </div>
-      </div>
+      <Alert v-if="isModerator && material.status === 'pending'" class="mb-6">
+        <ClockIcon />
+        <AlertTitle>Материал ожидает модерации</AlertTitle>
+        <AlertDescription>
+          <p>Добавлен: {{ material.author_name || 'неизвестно' }}</p>
+          <div class="mt-2 flex gap-2">
+            <Button size="sm" @click="moderate('approve')">
+              <CheckIcon />
+              Принять
+            </Button>
+            <Button size="sm" variant="destructive" @click="moderate('reject')">
+              <XIcon />
+              Отклонить
+            </Button>
+          </div>
+        </AlertDescription>
+      </Alert>
 
-      <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <div class="xl:col-span-2">
+      <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <div class="space-y-6 xl:col-span-2">
           <MaterialViewer :material="material" @download="download" />
-          <NCard v-if="files.length" title="Файлы" :subtitle="`Прикреплено: ${files.length}`" class="mt-6">
-            <div class="space-y-2">
-              <div
-                v-for="f in files"
-                :key="f.id"
-                class="flex items-center gap-3 bg-surface-2 border border-line px-3 py-2"
-              >
-                <NIcon :name="fileIcon(fileKind(f.name, f.mime))" :size="18" class="text-accent shrink-0" />
-                <div class="min-w-0 flex-1">
-                  <div class="text-sm font-semibold text-ink break-all">{{ f.name }}</div>
-                  <div class="text-xs text-muted">{{ formatBytes(f.size) }}</div>
-                </div>
-                <button
-                  class="text-muted hover:text-accent transition-colors cursor-pointer shrink-0"
-                  title="Скачать"
-                  @click="download(f)"
-                >
-                  <NIcon name="download" :size="16" />
-                </button>
-              </div>
-            </div>
-          </NCard>
+
+          <Card v-if="files.length">
+            <CardHeader>
+              <CardTitle>Файлы</CardTitle>
+              <CardDescription>Прикреплено: {{ files.length }}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ItemGroup class="gap-2">
+                <Item v-for="f in files" :key="f.id" variant="outline" size="sm">
+                  <ItemMedia variant="icon">
+                    <component :is="fileIcon(fileKind(f.name, f.mime))" class="text-primary" />
+                  </ItemMedia>
+                  <ItemContent class="min-w-0">
+                    <ItemTitle class="break-all">{{ f.name }}</ItemTitle>
+                    <ItemDescription>{{ formatBytes(f.size) }}</ItemDescription>
+                  </ItemContent>
+                  <ItemActions>
+                    <Tooltip>
+                      <TooltipTrigger as-child>
+                        <Button variant="ghost" size="icon-sm" @click="download(f)">
+                          <DownloadIcon />
+                          <span class="sr-only">Скачать</span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Скачать</TooltipContent>
+                    </Tooltip>
+                  </ItemActions>
+                </Item>
+              </ItemGroup>
+            </CardContent>
+          </Card>
         </div>
 
         <div class="space-y-6">
-          <NCard title="Подробная информация" accent>
-            <dl class="divide-y divide-line text-sm">
-              <div class="flex justify-between gap-4 py-2.5">
-                <dt class="text-muted">Категория</dt>
-                <dd class="text-ink font-semibold flex items-center gap-1.5">
-                  <NIcon :name="meta.icon" :size="15" class="text-accent" />{{ meta.label }}
-                </dd>
-              </div>
-              <div class="flex justify-between gap-4 py-2.5">
-                <dt class="text-muted">Статус</dt>
-                <dd>
-                  <NBadge :variant="STATUS_VARIANTS[material.status]" dot>{{ STATUS_LABELS[material.status] }}</NBadge>
-                </dd>
-              </div>
-              <div class="flex justify-between gap-4 py-2.5">
-                <dt class="text-muted">Состояние</dt>
-                <dd class="text-ink text-right">{{ material.condition || '—' }}</dd>
-              </div>
-              <div class="flex justify-between gap-4 py-2.5">
-                <dt class="text-muted">Физический экземпляр</dt>
-                <dd class="text-ink text-right">{{ material.location || '—' }}</dd>
-              </div>
-              <div class="flex justify-between gap-4 py-2.5">
-                <dt class="text-muted">Время происхождения</dt>
-                <dd class="text-ink text-right">{{ formatDate(material.origin_date) }}</dd>
-              </div>
-              <div class="flex justify-between gap-4 py-2.5">
-                <dt class="text-muted">Добавлен в базу</dt>
-                <dd class="text-ink text-right">{{ formatDateTime(material.created_at) }}</dd>
-              </div>
-              <div class="flex justify-between gap-4 py-2.5">
-                <dt class="text-muted">Добавил</dt>
-                <dd class="text-ink text-right">{{ material.author_name || '—' }}</dd>
-              </div>
-              <div v-if="files.length" class="flex justify-between gap-4 py-2.5">
-                <dt class="text-muted">Файлов</dt>
-                <dd class="text-ink text-right">{{ files.length }}</dd>
-              </div>
-            </dl>
-          </NCard>
-
-          <NCard v-if="material.description" title="Описание">
-            <p class="text-sm text-muted whitespace-pre-line">{{ material.description }}</p>
-          </NCard>
-
-          <NCard v-if="isHeadTeacher" title="Права доступа" subtitle="Кому разрешён просмотр материала">
-            <div class="space-y-3">
-              <div v-if="!permissions.length" class="text-sm text-muted">
-                Индивидуальные разрешения не выданы
-              </div>
-              <div
-                v-for="p in permissions"
-                :key="p.id"
-                class="flex items-center justify-between gap-3 bg-surface-2 border border-line px-3 py-2"
-              >
-                <div class="min-w-0">
-                  <div class="text-sm font-semibold text-ink truncate">{{ p.full_name }}</div>
-                  <div class="text-xs text-muted">{{ ROLE_LABELS[p.role] || p.role }}</div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Подробная информация</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <dl class="divide-y text-sm">
+                <div class="flex justify-between gap-4 py-2.5 first:pt-0">
+                  <dt class="text-muted-foreground">Категория</dt>
+                  <dd class="flex items-center gap-1.5 font-medium">
+                    <component :is="meta.icon" class="size-4 text-muted-foreground" />{{ meta.label }}
+                  </dd>
                 </div>
-                <button
-                  class="text-muted hover:text-danger transition-colors cursor-pointer"
-                  title="Отозвать доступ"
-                  @click="revoke(p)"
-                >
-                  <NIcon name="close" :size="16" />
-                </button>
-              </div>
-              <div class="flex gap-2 items-end">
-                <div class="flex-1">
-                  <NSelect v-model="grantUserId" label="Выдать доступ" :options="userOptions" placeholder="Выберите пользователя…" />
+                <div class="flex items-center justify-between gap-4 py-2.5">
+                  <dt class="text-muted-foreground">Статус</dt>
+                  <dd>
+                    <StatusBadge :tone="STATUS_TONES[material.status]">{{ STATUS_LABELS[material.status] }}</StatusBadge>
+                  </dd>
                 </div>
-                <NButton icon="userPlus" :disabled="!grantUserId" @click="grant">Выдать</NButton>
-              </div>
-            </div>
-          </NCard>
+                <div v-for="row in details" :key="row.label" class="flex justify-between gap-4 py-2.5 last:pb-0">
+                  <dt class="text-muted-foreground">{{ row.label }}</dt>
+                  <dd class="text-right">{{ row.value }}</dd>
+                </div>
+              </dl>
+            </CardContent>
+          </Card>
+
+          <Card v-if="material.description">
+            <CardHeader>
+              <CardTitle>Описание</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p class="whitespace-pre-line text-muted-foreground">{{ material.description }}</p>
+            </CardContent>
+          </Card>
+
+          <Card v-if="isHeadTeacher">
+            <CardHeader>
+              <CardTitle>Права доступа</CardTitle>
+              <CardDescription>Кому разрешён просмотр материала</CardDescription>
+            </CardHeader>
+            <CardContent class="space-y-4">
+              <p v-if="!permissions.length" class="text-muted-foreground">Индивидуальные разрешения не выданы</p>
+              <ItemGroup v-else class="gap-2">
+                <Item v-for="p in permissions" :key="p.id" variant="outline" size="sm">
+                  <ItemContent class="min-w-0">
+                    <ItemTitle class="truncate">{{ p.full_name }}</ItemTitle>
+                    <ItemDescription>{{ ROLE_LABELS[p.role] || p.role }}</ItemDescription>
+                  </ItemContent>
+                  <ItemActions>
+                    <Tooltip>
+                      <TooltipTrigger as-child>
+                        <Button variant="ghost" size="icon-sm" @click="revoke(p)">
+                          <XIcon />
+                          <span class="sr-only">Отозвать доступ</span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Отозвать доступ</TooltipContent>
+                    </Tooltip>
+                  </ItemActions>
+                </Item>
+              </ItemGroup>
+              <Field>
+                <FieldLabel for="grant-user">Выдать доступ</FieldLabel>
+                <div class="flex gap-2">
+                  <SearchSelect
+                    id="grant-user"
+                    v-model="grantUserId"
+                    :options="userOptions"
+                    placeholder="Выберите пользователя…"
+                    search-placeholder="Поиск по имени…"
+                    empty-text="Пользователи не найдены"
+                  />
+                  <Button :disabled="!grantUserId" @click="grant">
+                    <UserPlusIcon />
+                    Выдать
+                  </Button>
+                </div>
+              </Field>
+            </CardContent>
+          </Card>
         </div>
       </div>
 
-      <NModal v-model="qrOpen" title="QR-код экспоната" subtitle="Вы можете наклеить на физический экземпляр. Код ведёт на эту карточку">
-        <div class="flex flex-col items-center gap-4">
-          <img :src="qrUrl" alt="QR-код" class="w-64 h-64 bg-white p-2 border border-line" />
-          <div class="text-xs text-muted">Экспонат №{{ material.id }} · {{ material.title }}</div>
-        </div>
-        <template #footer>
-          <NButton variant="secondary" icon="download" @click="openQrPng">Открыть PNG</NButton>
-          <NButton icon="printer" @click="printQr">Печать</NButton>
-        </template>
-      </NModal>
-
-      <NModal v-model="exportOpen" title="Экспорт карточки" subtitle="Выберите формат файла">
-        <div class="grid grid-cols-2 gap-3">
-          <button
-            class="border border-line hover:border-accent p-5 text-center transition-colors ng-tile-press cursor-pointer"
-            @click="exportCard('json')"
-          >
-            <NIcon name="code" :size="26" class="text-accent inline-block" />
-            <div class="font-bold text-ink mt-2">JSON</div>
-          </button>
-          <button
-            class="border border-line hover:border-accent p-5 text-center transition-colors ng-tile-press cursor-pointer"
-            @click="exportCard('xml')"
-          >
-            <NIcon name="fileText" :size="26" class="text-accent inline-block" />
-            <div class="font-bold text-ink mt-2">XML</div>
-          </button>
-        </div>
-      </NModal>
+      <Dialog v-model:open="qrOpen">
+        <DialogContent class="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>QR-код экспоната</DialogTitle>
+            <DialogDescription>Наклейте его на физический экземпляр — код ведёт на эту карточку.</DialogDescription>
+          </DialogHeader>
+          <div class="flex flex-col items-center gap-3">
+            <img :src="qrUrl" alt="QR-код" class="size-56 rounded-lg bg-white p-2 ring-1 ring-foreground/10" />
+            <p class="text-center text-xs text-muted-foreground">Экспонат №{{ material.id }} · {{ material.title }}</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" @click="openQrPng">
+              <ExternalLinkIcon />
+              Открыть PNG
+            </Button>
+            <Button @click="printQr">
+              <PrinterIcon />
+              Печать
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </template>
 
-    <div v-else class="text-center text-muted py-16">Загрузка…</div>
+    <div v-else class="space-y-6">
+      <div class="space-y-2">
+        <Skeleton class="h-8 w-80 max-w-full" />
+        <Skeleton class="h-4 w-48" />
+      </div>
+      <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <Skeleton class="h-96 rounded-xl xl:col-span-2" />
+        <Skeleton class="h-72 rounded-xl" />
+      </div>
+    </div>
   </div>
 </template>

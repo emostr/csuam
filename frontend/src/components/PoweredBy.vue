@@ -9,7 +9,7 @@ function brand(p: StackPath): string {
 </script>
 
 <template>
-  <div class="flex items-center gap-3 text-xs text-faint">
+  <div class="flex items-center gap-3 text-xs text-muted-foreground">
     <span>powered by</span>
     <ul class="flex items-center gap-2.5">
       <li v-for="item in STACK" :key="item.label">

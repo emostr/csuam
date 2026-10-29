@@ -1,14 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useRouter } from 'vue-router'
-import NIcon from '@/components/ui/NIcon.vue'
-import NBadge from '@/components/ui/NBadge.vue'
-import { categoryMeta, STATUS_LABELS, STATUS_VARIANTS, formatDate } from '@/lib/catalog'
+import { RouterLink } from 'vue-router'
+import { PaperclipIcon } from '@lucide/vue'
+import StatusBadge from '@/components/StatusBadge.vue'
+import { categoryMeta, STATUS_LABELS, STATUS_TONES, formatDate } from '@/lib/catalog'
 import type { Material } from '@/lib/types'
 
 const props = defineProps<{ material: Material }>()
 
-const router = useRouter()
 const meta = computed(() => categoryMeta(props.material.category))
 const preview = computed(() => props.material.files.find((f) => f.mime.startsWith('image/')) ?? null)
 const previewUrl = computed(() =>
@@ -18,39 +17,39 @@ const fileCount = computed(() => props.material.files.length)
 </script>
 
 <template>
-  <button
-    class="text-left bg-surface border border-line hover:border-accent transition-colors ng-tile-press cursor-pointer flex flex-col overflow-hidden"
-    @click="router.push(`/material/${material.id}`)"
+  <RouterLink
+    :to="`/material/${material.id}`"
+    class="group flex flex-col overflow-hidden rounded-xl bg-card text-card-foreground shadow-xs ring-1 ring-foreground/10 transition-shadow outline-none hover:shadow-md hover:ring-foreground/20 focus-visible:ring-3 focus-visible:ring-ring/50"
   >
-    <div class="h-36 bg-surface-2 flex items-center justify-center overflow-hidden shrink-0 relative">
+    <div class="relative flex aspect-video items-center justify-center overflow-hidden bg-muted">
       <img
         v-if="preview"
         :src="previewUrl"
         :alt="material.title"
-        class="w-full h-full object-cover"
+        class="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
         loading="lazy"
       />
-      <NIcon v-else :name="meta.icon" :size="40" class="text-faint" />
+      <component :is="meta.icon" v-else class="size-10 text-muted-foreground/60" />
       <span
         v-if="fileCount > 1"
-        class="absolute bottom-2 right-2 flex items-center gap-1 bg-surface/90 border border-line text-[11px] font-bold text-ink px-1.5 py-0.5"
+        class="absolute right-2 bottom-2 flex items-center gap-1 rounded-md bg-background/90 px-1.5 py-0.5 text-xs font-medium shadow-xs backdrop-blur"
       >
-        <NIcon name="archive" :size="12" />{{ fileCount }}
+        <PaperclipIcon class="size-3" />{{ fileCount }}
       </span>
     </div>
-    <div class="p-4 flex-1 flex flex-col gap-2">
+    <div class="flex flex-1 flex-col gap-2 p-4">
       <div class="flex items-start justify-between gap-2">
-        <div class="font-bold text-ink text-sm leading-snug line-clamp-2">{{ material.title }}</div>
-        <NBadge v-if="material.status !== 'approved'" :variant="STATUS_VARIANTS[material.status]">
+        <h3 class="line-clamp-2 leading-snug font-medium">{{ material.title }}</h3>
+        <StatusBadge v-if="material.status !== 'approved'" :tone="STATUS_TONES[material.status]" class="shrink-0">
           {{ STATUS_LABELS[material.status] }}
-        </NBadge>
+        </StatusBadge>
       </div>
-      <p v-if="material.description" class="text-xs text-muted line-clamp-2">{{ material.description }}</p>
-      <div class="mt-auto flex items-center gap-2 text-[11px] text-faint pt-1">
-        <NIcon :name="meta.icon" :size="13" />
+      <p v-if="material.description" class="line-clamp-2 text-sm text-muted-foreground">{{ material.description }}</p>
+      <div class="mt-auto flex items-center gap-1.5 pt-1 text-xs text-muted-foreground">
+        <component :is="meta.icon" class="size-3.5" />
         <span>{{ meta.label }}</span>
         <span class="ml-auto">{{ formatDate(material.origin_date || material.created_at) }}</span>
       </div>
     </div>
-  </button>
+  </RouterLink>
 </template>

@@ -6,7 +6,7 @@
 
 ## Стек
 
-- Фронтенд: TypeScript 7, Vue 3, TailwindCSS
+- Фронтенд: TypeScript 7, Vue 3, TailwindCSS, shadcn-vue
 - Бэкенд: Go, Chi, sqlc (pgx)
 - СУБД: PostgreSQL
 - Хранилище файлов: S3-совместимое (Garage)

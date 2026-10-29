@@ -1,14 +1,25 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import NPageHeader from '@/components/ui/NPageHeader.vue'
-import NButton from '@/components/ui/NButton.vue'
-import NInput from '@/components/ui/NInput.vue'
-import NSelect from '@/components/ui/NSelect.vue'
-import NDateInput from '@/components/ui/NDateInput.vue'
-import NTile from '@/components/ui/NTile.vue'
-import NAlert from '@/components/ui/NAlert.vue'
-import MaterialCard from '@/components/MaterialCard.vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
+import {
+  AwardIcon,
+  BookOpenIcon,
+  ClockIcon,
+  ImageIcon,
+  PackageIcon,
+  PlusIcon,
+  SearchIcon,
+  TriangleAlertIcon,
+  UploadIcon,
+} from '@lucide/vue'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import PageHeader from '@/components/PageHeader.vue'
+import StatCard from '@/components/StatCard.vue'
+import DatePicker from '@/components/DatePicker.vue'
+import MaterialGrid from '@/components/MaterialGrid.vue'
 import { api, errorMessage } from '@/lib/api'
 import { notify } from '@/lib/notify'
 import { user, isModerator } from '@/lib/auth'
@@ -19,6 +30,7 @@ const route = useRoute()
 const router = useRouter()
 
 const queryString = (v: unknown): string => (typeof v === 'string' ? v : '')
+const fromSelect = (v: unknown): string => (typeof v === 'string' && v !== 'all' ? v : '')
 
 const materials = ref<Material[]>([])
 const loading = ref(true)
@@ -30,12 +42,7 @@ const status = ref(queryString(route.query.status))
 const from = ref('')
 const to = ref('')
 
-const categoryOptions = [
-  { value: '', label: 'Все категории' },
-  ...CATEGORIES.map((c) => ({ value: c.id, label: c.label })),
-]
 const statusOptions = [
-  { value: '', label: 'Все статусы' },
   { value: 'approved', label: 'Опубликованные' },
   { value: 'pending', label: 'На модерации' },
   { value: 'rejected', label: 'Отклонённые' },
@@ -125,13 +132,16 @@ async function onImportFile(e: Event) {
 
 <template>
   <div>
-    <NPageHeader
-      title="Главная"
-      :subtitle="`Добро пожаловать, ${user?.full_name || ''}!`"
-    >
+    <PageHeader title="Главная" :description="`Добро пожаловать, ${user?.full_name || ''}!`">
       <template #actions>
-        <NButton variant="secondary" icon="upload" @click="startImport">Импорт карточки</NButton>
-        <NButton icon="plus" @click="router.push('/add')">Добавить экспонат</NButton>
+        <Button variant="outline" @click="startImport">
+          <UploadIcon />
+          Импорт карточки
+        </Button>
+        <Button @click="router.push('/add')">
+          <PlusIcon />
+          Добавить экспонат
+        </Button>
         <input
           ref="importInput"
           type="file"
@@ -140,53 +150,65 @@ async function onImportFile(e: Event) {
           @change="onImportFile"
         />
       </template>
-    </NPageHeader>
+    </PageHeader>
 
-    <div v-if="summary" class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-      <NTile label="Всего единиц" :value="summary.total" icon="box" solid />
-      <NTile label="Фотографии" :value="counts.photos || 0" icon="image" />
-      <NTile label="Библиотека" :value="counts.library || 0" icon="book" />
-      <NTile
-        v-if="isModerator"
-        label="На модерации"
-        :value="summary.pending"
-        icon="clock"
-      />
-      <NTile v-else label="Награды" :value="counts.awards || 0" icon="award" />
+    <div v-if="summary" class="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <StatCard label="Всего единиц" :value="summary.total" :icon="PackageIcon" />
+      <StatCard label="Фотографии" :value="counts.photos || 0" :icon="ImageIcon" />
+      <StatCard label="Библиотека" :value="counts.library || 0" :icon="BookOpenIcon" />
+      <StatCard v-if="isModerator" label="На модерации" :value="summary.pending" :icon="ClockIcon" />
+      <StatCard v-else label="Награды" :value="counts.awards || 0" :icon="AwardIcon" />
     </div>
 
-    <NAlert
-      v-if="isModerator && summary && summary.overdue_loans > 0"
-      variant="danger"
-      title="Просроченный прокат"
-      class="mb-6"
+    <Alert v-if="isModerator && summary && summary.overdue_loans > 0" variant="destructive" class="mb-6">
+      <TriangleAlertIcon />
+      <AlertTitle>Просроченный прокат</AlertTitle>
+      <AlertDescription>
+        <p>
+          Не возвращено вовремя книг: {{ summary.overdue_loans }}.
+          <RouterLink to="/loans" class="font-medium underline underline-offset-4">Перейти в «Прокат»</RouterLink>
+        </p>
+      </AlertDescription>
+    </Alert>
+
+    <div
+      class="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2"
+      :class="isModerator ? 'lg:grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))]' : 'lg:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]'"
     >
-      Не возвращено вовремя книг: {{ summary.overdue_loans }}.
-      <RouterLink to="/loans" class="text-accent font-semibold hover:underline">Перейти в «Прокат»</RouterLink>
-    </NAlert>
-
-    <div class="bg-surface border border-line p-4 mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
-      <form class="lg:col-span-2" @submit.prevent="load">
-        <NInput v-model="q" label="Поиск" placeholder="Ключевые слова…" icon="search" @keyup.enter="load" />
+      <form class="sm:col-span-2 lg:col-span-1" role="search" @submit.prevent="load">
+        <InputGroup>
+          <InputGroupAddon>
+            <SearchIcon />
+          </InputGroupAddon>
+          <InputGroupInput v-model="q" placeholder="Поиск по названию и описанию…" aria-label="Поиск" />
+        </InputGroup>
       </form>
-      <NSelect v-model="category" label="Категория" :options="categoryOptions" />
-      <NDateInput v-model="from" label="Происхождение с" />
-      <NDateInput v-model="to" label="Происхождение по" />
-      <NSelect
-        v-if="isModerator"
-        v-model="status"
-        label="Статус"
-        :options="statusOptions"
-        class="lg:col-start-5"
-      />
+      <Select :model-value="category || 'all'" @update:model-value="category = fromSelect($event)">
+        <SelectTrigger class="w-full" aria-label="Категория">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Все категории</SelectItem>
+          <SelectItem v-for="c in CATEGORIES" :key="c.id" :value="c.id">{{ c.label }}</SelectItem>
+        </SelectContent>
+      </Select>
+      <DatePicker v-model="from" placeholder="Происхождение с" />
+      <DatePicker v-model="to" placeholder="Происхождение по" />
+      <Select v-if="isModerator" :model-value="status || 'all'" @update:model-value="status = fromSelect($event)">
+        <SelectTrigger class="w-full" aria-label="Статус">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Все статусы</SelectItem>
+          <SelectItem v-for="s in statusOptions" :key="s.value" :value="s.value">{{ s.label }}</SelectItem>
+        </SelectContent>
+      </Select>
     </div>
 
-    <div v-if="loading" class="text-center text-muted py-16">Загрузка…</div>
-    <div v-else-if="!materials.length" class="bg-surface border border-line py-16 text-center text-muted">
-      Ничего не найдено. Попробуйте изменить условия поиска.
-    </div>
-    <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      <MaterialCard v-for="m in materials" :key="m.id" :material="m" />
-    </div>
+    <MaterialGrid
+      :materials="materials"
+      :loading="loading"
+      empty-text="Попробуйте изменить условия поиска или сбросить фильтры."
+    />
   </div>
 </template>

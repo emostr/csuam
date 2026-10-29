@@ -1,7 +1,22 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import NIcon from '@/components/ui/NIcon.vue'
-import NTabs from '@/components/ui/NTabs.vue'
+import {
+  BoldIcon,
+  CodeIcon,
+  Heading2Icon,
+  ItalicIcon,
+  LinkIcon,
+  ListIcon,
+  ListOrderedIcon,
+  MinusIcon,
+  PencilIcon,
+  QuoteIcon,
+  StrikethroughIcon,
+  UnderlineIcon,
+} from '@lucide/vue'
+import { Button } from '@/components/ui/button'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { notify } from '@/lib/notify'
 import { renderMarkdown } from '@/lib/markdown'
 import type { ContentFormat } from '@/lib/types'
@@ -18,20 +33,8 @@ const emit = defineEmits<{
   'update:format': [value: ContentFormat]
 }>()
 
-const tabs = [
-  { value: 'html', label: 'Визуальный', icon: 'edit' },
-  { value: 'markdown', label: 'Markdown', icon: 'code' },
-]
-
 const editor = ref<HTMLDivElement | null>(null)
 const mdText = ref(props.format === 'markdown' ? props.content : '')
-
-const mode = computed<string | number>({
-  get: () => props.format,
-  set: (v) => {
-    if (v === 'html' || v === 'markdown') switchMode(v)
-  },
-})
 
 onMounted(() => {
   if (props.format === 'html' && editor.value) {
@@ -45,6 +48,10 @@ watch(mdText, (v) => {
 
 function onInput() {
   emit('update:content', editor.value?.innerHTML || '')
+}
+
+function onModeChange(v: unknown) {
+  if (v === 'html' || v === 'markdown') switchMode(v)
 }
 
 async function switchMode(v: ContentFormat) {
@@ -70,16 +77,16 @@ async function switchMode(v: ContentFormat) {
 }
 
 const toolbar = [
-  { icon: 'heading', title: 'Заголовок', run: () => exec('formatBlock', 'h2') },
-  { icon: 'bold', title: 'Жирный', run: () => exec('bold') },
-  { icon: 'italic', title: 'Курсив', run: () => exec('italic') },
-  { icon: 'underline', title: 'Подчёркнутый', run: () => exec('underline') },
-  { icon: 'strikethrough', title: 'Зачёркнутый', run: () => exec('strikeThrough') },
-  { icon: 'list', title: 'Список', run: () => exec('insertUnorderedList') },
-  { icon: 'listOrdered', title: 'Нумерованный список', run: () => exec('insertOrderedList') },
-  { icon: 'quote', title: 'Цитата', run: () => exec('formatBlock', 'blockquote') },
-  { icon: 'link', title: 'Ссылка', run: addLink },
-  { icon: 'minus', title: 'Разделитель', run: () => exec('insertHorizontalRule') },
+  { icon: Heading2Icon, title: 'Заголовок', run: () => exec('formatBlock', 'h2') },
+  { icon: BoldIcon, title: 'Жирный', run: () => exec('bold') },
+  { icon: ItalicIcon, title: 'Курсив', run: () => exec('italic') },
+  { icon: UnderlineIcon, title: 'Подчёркнутый', run: () => exec('underline') },
+  { icon: StrikethroughIcon, title: 'Зачёркнутый', run: () => exec('strikeThrough') },
+  { icon: ListIcon, title: 'Список', run: () => exec('insertUnorderedList') },
+  { icon: ListOrderedIcon, title: 'Нумерованный список', run: () => exec('insertOrderedList') },
+  { icon: QuoteIcon, title: 'Цитата', run: () => exec('formatBlock', 'blockquote') },
+  { icon: LinkIcon, title: 'Ссылка', run: addLink },
+  { icon: MinusIcon, title: 'Разделитель', run: () => exec('insertHorizontalRule') },
 ]
 
 function exec(cmd: string, value?: string) {
@@ -100,42 +107,51 @@ const preview = computed(() => renderMarkdown(mdText.value))
 </script>
 
 <template>
-  <div class="border border-line bg-surface">
-    <div class="px-3 pt-2 border-b border-line bg-surface-2/40">
-      <NTabs v-model="mode" :tabs="tabs" class="!border-0" />
+  <div class="overflow-hidden rounded-lg border shadow-xs">
+    <div class="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/40 px-2 py-1.5">
+      <div v-if="format === 'html'" class="flex flex-wrap items-center gap-0.5">
+        <Tooltip v-for="btn in toolbar" :key="btn.title">
+          <TooltipTrigger as-child>
+            <Button type="button" variant="ghost" size="icon-sm" @mousedown.prevent @click="btn.run">
+              <component :is="btn.icon" />
+              <span class="sr-only">{{ btn.title }}</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{{ btn.title }}</TooltipContent>
+        </Tooltip>
+      </div>
+      <span v-else class="px-1.5 text-xs text-muted-foreground">Слева — разметка, справа — предпросмотр</span>
+
+      <Tabs :model-value="format" class="ml-auto" @update:model-value="onModeChange">
+        <TabsList>
+          <TabsTrigger value="html">
+            <PencilIcon />
+            Визуальный
+          </TabsTrigger>
+          <TabsTrigger value="markdown">
+            <CodeIcon />
+            Markdown
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
     </div>
 
-    <template v-if="mode === 'html'">
-      <div class="flex flex-wrap items-center gap-0.5 px-2 py-1.5 border-b border-line">
-        <button
-          v-for="btn in toolbar"
-          :key="btn.title"
-          type="button"
-          :title="btn.title"
-          class="h-8 w-8 flex items-center justify-center text-muted hover:text-ink hover:bg-surface-2 transition-colors cursor-pointer"
-          @mousedown.prevent
-          @click="btn.run"
-        >
-          <NIcon :name="btn.icon" :size="16" />
-        </button>
-      </div>
-      <div
-        ref="editor"
-        contenteditable="true"
-        class="prose-archive min-h-[280px] max-h-[60vh] overflow-y-auto p-4 outline-none text-sm"
-        @input="onInput"
-      />
-    </template>
+    <div
+      v-if="format === 'html'"
+      ref="editor"
+      contenteditable="true"
+      class="prose-archive max-h-[60vh] min-h-[280px] overflow-y-auto p-4 text-sm outline-none"
+      @input="onInput"
+    />
 
-    <template v-else>
-      <div class="grid md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-line">
-        <textarea
-          v-model="mdText"
-          class="min-h-[280px] max-h-[60vh] p-4 bg-transparent text-sm text-ink font-mono outline-none resize-none placeholder:text-faint"
-          placeholder="# Заголовок&#10;&#10;Текст в формате **Markdown**…"
-        />
-        <div class="prose-archive min-h-[280px] max-h-[60vh] overflow-y-auto p-4 text-sm" v-html="preview" />
-      </div>
-    </template>
+    <div v-else class="grid divide-y md:grid-cols-2 md:divide-x md:divide-y-0">
+      <textarea
+        v-model="mdText"
+        class="max-h-[60vh] min-h-[280px] resize-none bg-transparent p-4 font-mono text-sm outline-none placeholder:text-muted-foreground"
+        placeholder="# Заголовок&#10;&#10;Текст в формате **Markdown**…"
+        aria-label="Текст в формате Markdown"
+      />
+      <div class="prose-archive max-h-[60vh] min-h-[280px] overflow-y-auto p-4 text-sm" v-html="preview" />
+    </div>
   </div>
 </template>

@@ -1,42 +1,31 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import Sidebar from './Sidebar.vue'
-import Topbar from './Topbar.vue'
+import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
+import AppSidebar from './AppSidebar.vue'
+import AppHeader from './AppHeader.vue'
 import PoweredBy from '@/components/PoweredBy.vue'
-
-const sidebarOpen = ref(false)
 </script>
 
 <template>
-  <div class="min-h-screen flex bg-bg">
-    <Transition name="modal">
-      <div
-        v-if="sidebarOpen"
-        class="fixed inset-0 z-30 bg-black/60 lg:hidden"
-        @click="sidebarOpen = false"
-      />
-    </Transition>
+  <SidebarProvider>
+    <AppSidebar />
+    <SidebarInset class="min-w-0">
+      <AppHeader />
 
-    <Sidebar :open="sidebarOpen" @close="sidebarOpen = false" />
-
-    <div class="flex-1 min-w-0 flex flex-col">
-      <Topbar @toggle-sidebar="sidebarOpen = !sidebarOpen" />
-
-      <main class="flex-1 p-4 sm:p-6 lg:p-8">
+      <div class="mx-auto w-full max-w-screen-2xl flex-1 p-4 md:p-6 lg:p-8">
         <RouterView v-slot="{ Component }">
           <Transition name="view-fade" mode="out-in">
             <component :is="Component" />
           </Transition>
         </RouterView>
-      </main>
+      </div>
 
-      <footer class="border-t border-line px-4 sm:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-        <p class="text-xs text-faint">ЦСУАМ "Архивли"</p>
+      <footer
+        class="flex flex-col items-center justify-between gap-3 border-t px-4 py-4 text-xs text-muted-foreground sm:flex-row md:px-6"
+      >
+        <p>ЦСУАМ «Архивли»</p>
         <PoweredBy />
-        <div class="flex items-center gap-4 text-xs text-faint">
-          <span>2026</span>
-        </div>
+        <span>2026</span>
       </footer>
-    </div>
-  </div>
+    </SidebarInset>
+  </SidebarProvider>
 </template>

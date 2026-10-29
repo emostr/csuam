@@ -1,25 +1,38 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
-import NPageHeader from '@/components/ui/NPageHeader.vue'
-import NButton from '@/components/ui/NButton.vue'
-import NTable from '@/components/ui/NTable.vue'
-import NTabs from '@/components/ui/NTabs.vue'
-import NBadge from '@/components/ui/NBadge.vue'
-import NModal from '@/components/ui/NModal.vue'
-import NInput from '@/components/ui/NInput.vue'
-import NTextarea from '@/components/ui/NTextarea.vue'
-import NSelect from '@/components/ui/NSelect.vue'
-import NDateInput from '@/components/ui/NDateInput.vue'
+import { RouterLink } from 'vue-router'
+import { ArchiveIcon, CheckIcon, ClockIcon, PlusIcon } from '@lucide/vue'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Spinner } from '@/components/ui/spinner'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Textarea } from '@/components/ui/textarea'
+import PageHeader from '@/components/PageHeader.vue'
+import DatePicker from '@/components/DatePicker.vue'
+import SearchSelect from '@/components/SearchSelect.vue'
 import { api, errorMessage } from '@/lib/api'
 import { notify } from '@/lib/notify'
 import { formatDate, formatDateTime, isOverdue } from '@/lib/catalog'
 import type { Loan, Material } from '@/lib/types'
-import type { SelectOption, TabItem, TableColumn } from '@/lib/ui'
+import type { SelectOption } from '@/lib/ui'
 
-const router = useRouter()
+type LoanTab = 'active' | 'archive'
 
-const tab = ref<string | number>('active')
+const tab = ref<LoanTab>('active')
 const loans = ref<Loan[]>([])
 const loading = ref(true)
 
@@ -28,27 +41,11 @@ const books = ref<Material[]>([])
 const newLoan = ref({ material_id: '', borrower_name: '', due_date: '', note: '' })
 const saving = ref(false)
 
-const tabs = computed<TabItem[]>(() => [
-  { value: 'active', label: 'Активные', icon: 'clock' },
-  { value: 'archive', label: 'Архив', icon: 'archive' },
-])
-
-const columns = computed<TableColumn[]>(() => {
-  const cols: TableColumn[] = [
-    { key: 'material_title', label: 'Предмет' },
-    { key: 'borrower_name', label: 'Кто взял' },
-    { key: 'taken_at', label: 'Взято' },
-    { key: 'due_date', label: 'Срок возврата' },
-  ]
-  if (tab.value === 'active') {
-    cols.push({ key: 'actions', label: '', align: 'right' })
-  } else {
-    cols.push({ key: 'returned_at', label: 'Возвращено' })
-  }
-  return cols
-})
-
 const overdueCount = computed(() => loans.value.filter(isOverdue).length)
+
+function setTab(v: unknown) {
+  if (v === 'active' || v === 'archive') tab.value = v
+}
 
 async function load() {
   loading.value = true
@@ -103,8 +100,8 @@ async function createLoan() {
     })
     addOpen.value = false
     notify.success('Запись добавлена')
-    tab.value = 'active'
-    load()
+    if (tab.value === 'active') load()
+    else tab.value = 'active'
   } catch (e) {
     notify.error('Не удалось добавить запись', { text: errorMessage(e) })
   } finally {
@@ -132,60 +129,132 @@ async function markReturned(loan: Loan) {
 
 <template>
   <div>
-    <NPageHeader title="Прокат">
+    <PageHeader title="Прокат" description="Выдача книг из школьной библиотеки">
       <template #actions>
-        <NButton icon="plus" @click="openAdd">Выдать предмет</NButton>
+        <Button @click="openAdd">
+          <PlusIcon />
+          Выдать предмет
+        </Button>
       </template>
-    </NPageHeader>
+    </PageHeader>
 
-    <NTabs v-model="tab" :tabs="tabs" class="mb-6" />
+    <Tabs :model-value="tab" class="mb-4" @update:model-value="setTab">
+      <TabsList>
+        <TabsTrigger value="active">
+          <ClockIcon />
+          Активные
+        </TabsTrigger>
+        <TabsTrigger value="archive">
+          <ArchiveIcon />
+          Архив
+        </TabsTrigger>
+      </TabsList>
+    </Tabs>
 
-    <div v-if="loading" class="text-center text-muted py-16">Загрузка…</div>
-    <NTable v-else :columns="columns" :rows="loans">
-      <template #material_title="{ row }">
-        <button
-          class="font-semibold text-ink hover:text-accent transition-colors cursor-pointer text-left"
-          @click="router.push(`/material/${row.material_id}`)"
-        >
-          {{ row.material_title }}
-        </button>
-        <div v-if="row.note" class="text-xs text-muted mt-0.5">{{ row.note }}</div>
-      </template>
-      <template #taken_at="{ row }">
-        <span class="text-muted">{{ formatDate(row.taken_at) }}</span>
-      </template>
-      <template #due_date="{ row }">
-        <div class="flex items-center gap-2">
-          <span :class="isOverdue(row) ? 'text-danger font-bold' : ''">{{ formatDate(row.due_date) }}</span>
-          <NBadge v-if="isOverdue(row)" variant="danger" dot>Просрочено</NBadge>
-        </div>
-      </template>
-      <template #returned_at="{ row }">
-        <span class="text-muted">{{ formatDateTime(row.returned_at) }}</span>
-      </template>
-      <template #actions="{ row }">
-        <NButton size="sm" variant="secondary" icon="check" @click="markReturned(row)">
-          Предмет возвращён
-        </NButton>
-      </template>
-    </NTable>
+    <Card class="py-0">
+      <Table>
+        <TableHeader>
+          <TableRow class="hover:bg-transparent">
+            <TableHead class="pl-4">Предмет</TableHead>
+            <TableHead>Кто взял</TableHead>
+            <TableHead>Взято</TableHead>
+            <TableHead>Срок возврата</TableHead>
+            <TableHead v-if="tab === 'archive'" class="pr-4">Возвращено</TableHead>
+            <TableHead v-else class="pr-4"><span class="sr-only">Действия</span></TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <template v-if="loading">
+            <TableRow v-for="i in 4" :key="i">
+              <TableCell class="pl-4"><Skeleton class="h-4 w-48" /></TableCell>
+              <TableCell><Skeleton class="h-4 w-32" /></TableCell>
+              <TableCell><Skeleton class="h-4 w-24" /></TableCell>
+              <TableCell><Skeleton class="h-4 w-24" /></TableCell>
+              <TableCell class="pr-4"><Skeleton class="ml-auto h-8 w-36" /></TableCell>
+            </TableRow>
+          </template>
+          <TableRow
+            v-for="row in loans"
+            v-else
+            :key="row.id"
+            :class="isOverdue(row) ? 'bg-destructive/5 hover:bg-destructive/10' : ''"
+          >
+            <TableCell class="pl-4 whitespace-normal">
+              <RouterLink :to="`/material/${row.material_id}`" class="font-medium hover:underline underline-offset-4">
+                {{ row.material_title }}
+              </RouterLink>
+              <div v-if="row.note" class="mt-0.5 text-xs text-muted-foreground">{{ row.note }}</div>
+            </TableCell>
+            <TableCell>{{ row.borrower_name }}</TableCell>
+            <TableCell class="text-muted-foreground">{{ formatDate(row.taken_at) }}</TableCell>
+            <TableCell>
+              <div class="flex items-center gap-2">
+                <span :class="isOverdue(row) ? 'font-medium text-destructive' : ''">{{ formatDate(row.due_date) }}</span>
+                <Badge v-if="isOverdue(row)" variant="destructive">Просрочено</Badge>
+              </div>
+            </TableCell>
+            <TableCell v-if="tab === 'archive'" class="pr-4 text-muted-foreground">
+              {{ formatDateTime(row.returned_at) }}
+            </TableCell>
+            <TableCell v-else class="pr-4 text-right">
+              <Button size="sm" variant="outline" @click="markReturned(row)">
+                <CheckIcon />
+                Предмет возвращён
+              </Button>
+            </TableCell>
+          </TableRow>
+          <TableRow v-if="!loading && !loans.length">
+            <TableCell colspan="5" class="h-24 text-center text-muted-foreground">
+              {{ tab === 'active' ? 'Сейчас ничего не выдано' : 'Архив пуст' }}
+            </TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
+    </Card>
 
-    <NModal v-model="addOpen" title="Выдать предмет" subtitle="Запись о выдаче книги из библиотеки">
-      <div class="space-y-4">
-        <NSelect
-          v-model="newLoan.material_id"
-          label="Предмет из библиотеки"
-          :options="bookOptions"
-          placeholder="Выберите книгу…"
-        />
-        <NInput v-model="newLoan.borrower_name" label="Кто взял" placeholder="ФИО и класс ученика" icon="user" />
-        <NDateInput v-model="newLoan.due_date" label="Вернуть до" />
-        <NTextarea v-model="newLoan.note" label="Заметка" placeholder="Дополнительная информация…" :rows="2" />
-      </div>
-      <template #footer="{ close }">
-        <NButton variant="ghost" @click="close">Отмена</NButton>
-        <NButton :loading="saving" icon="check" @click="createLoan">Записать</NButton>
-      </template>
-    </NModal>
+    <Dialog v-model:open="addOpen">
+      <DialogContent>
+        <form class="grid gap-6" @submit.prevent="createLoan">
+          <DialogHeader>
+            <DialogTitle>Выдать предмет</DialogTitle>
+            <DialogDescription>Запись о выдаче книги из библиотеки</DialogDescription>
+          </DialogHeader>
+          <FieldGroup>
+            <Field>
+              <FieldLabel for="loan-book">Предмет из библиотеки</FieldLabel>
+              <SearchSelect
+                id="loan-book"
+                v-model="newLoan.material_id"
+                :options="bookOptions"
+                placeholder="Выберите книгу…"
+                search-placeholder="Поиск по названию…"
+                empty-text="Книги не найдены"
+              />
+            </Field>
+            <Field>
+              <FieldLabel for="loan-borrower">Кто взял</FieldLabel>
+              <Input id="loan-borrower" v-model="newLoan.borrower_name" placeholder="ФИО и класс ученика" />
+            </Field>
+            <Field>
+              <FieldLabel for="loan-due">Вернуть до</FieldLabel>
+              <DatePicker id="loan-due" v-model="newLoan.due_date" />
+            </Field>
+            <Field>
+              <FieldLabel for="loan-note">Заметка</FieldLabel>
+              <Textarea id="loan-note" v-model="newLoan.note" placeholder="Дополнительная информация…" :rows="2" />
+            </Field>
+          </FieldGroup>
+          <DialogFooter>
+            <DialogClose as-child>
+              <Button type="button" variant="outline">Отмена</Button>
+            </DialogClose>
+            <Button type="submit" :disabled="saving">
+              <Spinner v-if="saving" />
+              Записать
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>

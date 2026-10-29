@@ -1,8 +1,9 @@
 import { shallowRef } from 'vue'
+import { toast } from 'vue-sonner'
 
-export type NotifyIcon = 'success' | 'error' | 'warning' | 'info' | 'question'
+export type NotifyIcon = 'warning' | 'info' | 'question'
 
-export type DialogKind = 'alert' | 'toast' | 'confirm' | 'prompt'
+export type DialogKind = 'confirm' | 'prompt'
 
 export interface DialogResult {
   confirmed: boolean
@@ -15,7 +16,6 @@ export interface Dialog {
   icon?: NotifyIcon
   title: string
   text: string
-  timer: number
   confirmText: string
   cancelText: string
   danger: boolean
@@ -30,8 +30,6 @@ type DialogFields = Partial<Omit<Dialog, 'id' | 'kind' | 'close'>>
 export interface NotifyOptions {
   text?: string
   timer?: number
-  icon?: NotifyIcon
-  toast?: boolean
 }
 
 export interface ConfirmOptions {
@@ -52,17 +50,9 @@ export interface PromptOptions {
   cancelText?: string
 }
 
-const ICON_TIMERS: Partial<Record<NotifyIcon, number>> = {
-  success: 1900,
-  info: 2600,
-  warning: 2600,
-  error: 1900,
-}
-
 const DIALOG_DEFAULTS: Required<Omit<DialogFields, 'icon'>> = {
   title: '',
   text: '',
-  timer: 0,
   confirmText: 'ОК',
   cancelText: 'Отмена',
   danger: false,
@@ -92,24 +82,23 @@ function open(kind: DialogKind, fields: DialogFields): Promise<DialogResult> {
   })
 }
 
-async function base(title: string, opts: NotifyOptions = {}): Promise<void> {
-  const { toast = false, icon, text = '', timer } = opts
-  await open(toast ? 'toast' : 'alert', {
-    icon,
-    title,
-    text,
-    timer: timer ?? (icon && ICON_TIMERS[icon]) ?? 2800,
-  })
+function toastOptions(opts: NotifyOptions) {
+  return { description: opts.text || undefined, duration: opts.timer }
 }
 
 export const notify = {
-  success: (title: string, opts: NotifyOptions = {}) => base(title, { icon: 'success', ...opts }),
-  error: (title: string, opts: NotifyOptions = {}) => base(title, { icon: 'error', ...opts }),
-  warning: (title: string, opts: NotifyOptions = {}) => base(title, { icon: 'warning', ...opts }),
-  info: (title: string, opts: NotifyOptions = {}) => base(title, { icon: 'info', ...opts }),
-
-  toast: (title: string, opts: NotifyOptions = {}) =>
-    base(title, { toast: true, icon: 'success', ...opts }),
+  success: (title: string, opts: NotifyOptions = {}) => {
+    toast.success(title, toastOptions(opts))
+  },
+  error: (title: string, opts: NotifyOptions = {}) => {
+    toast.error(title, toastOptions(opts))
+  },
+  warning: (title: string, opts: NotifyOptions = {}) => {
+    toast.warning(title, toastOptions(opts))
+  },
+  info: (title: string, opts: NotifyOptions = {}) => {
+    toast.info(title, toastOptions(opts))
+  },
 
   async confirm(opts: ConfirmOptions = {}): Promise<boolean> {
     const {

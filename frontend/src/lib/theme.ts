@@ -3,6 +3,8 @@ import { ref, watch } from 'vue'
 const THEME_KEY = 'ng-theme'
 const ACCENT_KEY = 'ng-accent'
 
+export type Theme = 'dark' | 'light'
+
 export interface Accent {
   id: string
   label: string
@@ -26,12 +28,17 @@ const stored = (key: string, fallback: string): string => {
   }
 }
 
-export const theme = ref(stored(THEME_KEY, 'dark'))
+const isTheme = (v: string): v is Theme => v === 'dark' || v === 'light'
+
+const initialTheme = stored(THEME_KEY, 'dark')
+
+export const theme = ref<Theme>(isTheme(initialTheme) ? initialTheme : 'dark')
 export const accent = ref(stored(ACCENT_KEY, 'teal'))
 
 function apply() {
   const el = document.documentElement
-  el.setAttribute('data-theme', theme.value)
+  el.classList.toggle('dark', theme.value === 'dark')
+  el.style.colorScheme = theme.value
   el.setAttribute('data-accent', accent.value)
 }
 
@@ -48,6 +55,10 @@ watch(accent, (v) => {
   } catch {}
   apply()
 })
+
+export function setTheme(v: Theme) {
+  theme.value = v
+}
 
 export function toggleTheme() {
   theme.value = theme.value === 'dark' ? 'light' : 'dark'

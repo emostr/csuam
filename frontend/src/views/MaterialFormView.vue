@@ -1,15 +1,39 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import NPageHeader from '@/components/ui/NPageHeader.vue'
-import NCard from '@/components/ui/NCard.vue'
-import NButton from '@/components/ui/NButton.vue'
-import NInput from '@/components/ui/NInput.vue'
-import NTextarea from '@/components/ui/NTextarea.vue'
-import NSelect from '@/components/ui/NSelect.vue'
-import NDateInput from '@/components/ui/NDateInput.vue'
-import NAlert from '@/components/ui/NAlert.vue'
-import NIcon from '@/components/ui/NIcon.vue'
+import {
+  CheckIcon,
+  ChevronLeftIcon,
+  FilePlusIcon,
+  InfoIcon,
+  PencilIcon,
+  RotateCcwIcon,
+  Trash2Icon,
+  UploadIcon,
+  XIcon,
+} from '@lucide/vue'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemMedia,
+  ItemTitle,
+} from '@/components/ui/item'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Spinner } from '@/components/ui/spinner'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Textarea } from '@/components/ui/textarea'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import PageHeader from '@/components/PageHeader.vue'
+import DatePicker from '@/components/DatePicker.vue'
 import TextEditor from '@/components/TextEditor.vue'
 import { api, errorMessage } from '@/lib/api'
 import { notify } from '@/lib/notify'
@@ -17,7 +41,6 @@ import { user } from '@/lib/auth'
 import { CATEGORIES, formatBytes } from '@/lib/catalog'
 import { ACCEPT, fileIcon, fileKind, isAcceptedName } from '@/lib/files'
 import type { ContentFormat, Material, MaterialCategory, MaterialFile } from '@/lib/types'
-import type { SelectOption } from '@/lib/ui'
 
 const route = useRoute()
 const router = useRouter()
@@ -62,19 +85,26 @@ const hasContent = ref(false)
 const saving = ref(false)
 const loaded = ref(false)
 
-const categoryOptions = computed<SelectOption[]>(() =>
-  CATEGORIES.filter((c) => c.id !== 'documents' || user.value?.role === 'head_teacher').map(
-    (c) => ({ value: c.id, label: c.label }),
-  ),
+const categories = computed(() =>
+  CATEGORIES.filter((c) => c.id !== 'documents' || user.value?.role === 'head_teacher'),
 )
 
 const isTeacher = computed(() => user.value?.role === 'teacher')
 const showFiles = computed(() => isEdit.value || sourceType.value === 'file')
 const showEditor = computed(() => (isEdit.value ? hasContent.value : sourceType.value === 'text'))
 
+function setCategory(v: unknown) {
+  const c = CATEGORIES.find((x) => x.id === v)
+  if (c) form.value.category = c.id
+}
+
+function setSourceType(v: unknown) {
+  if (v === 'file' || v === 'text') sourceType.value = v
+}
+
 onMounted(async () => {
   if (!isEdit.value) {
-    if (!categoryOptions.value.some((o) => o.value === form.value.category)) {
+    if (!categories.value.some((c) => c.id === form.value.category)) {
       form.value.category = 'photos'
     }
     loaded.value = true
@@ -212,161 +242,256 @@ async function submit() {
 
 <template>
   <div v-if="loaded">
-    <NPageHeader
+    <PageHeader
       :title="isEdit ? 'Редактирование экспоната' : 'Новый экспонат'"
-      :subtitle="isEdit ? 'Обновите сведения о материале' : 'Добавьте материал в цифровой архив школы'"
+      :description="isEdit ? 'Обновите сведения о материале' : 'Добавьте материал в цифровой архив школы'"
     >
       <template #actions>
-        <NButton variant="ghost" icon="chevronLeft" @click="router.back()">Назад</NButton>
+        <Button variant="ghost" @click="router.back()">
+          <ChevronLeftIcon />
+          Назад
+        </Button>
       </template>
-    </NPageHeader>
+    </PageHeader>
 
-    <NAlert v-if="isTeacher && !isEdit" variant="info" title="Премодерация" class="mb-6">
-      Материал будет опубликован после проверки библиотекарем или завучем.
-    </NAlert>
+    <Alert v-if="isTeacher && !isEdit" class="mb-6">
+      <InfoIcon />
+      <AlertTitle>Премодерация</AlertTitle>
+      <AlertDescription>Материал будет опубликован после проверки библиотекарем или завучем.</AlertDescription>
+    </Alert>
 
-    <form class="grid grid-cols-1 xl:grid-cols-3 gap-6" @submit.prevent="submit">
-      <div class="xl:col-span-2 space-y-6">
-        <NCard title="Основные сведения" accent>
-          <div class="space-y-4">
-            <NInput v-model="form.title" label="Название" placeholder="Например: Кубок за победу в олимпиаде, 1998 г." required />
-            <div class="grid sm:grid-cols-2 gap-4">
-              <NSelect v-model="form.category" label="Категория" :options="categoryOptions" :disabled="isEdit" />
-              <NDateInput v-model="form.origin_date" label="Время происхождения" hint="Если известно (у фотографий, наград и т.д.)" />
-            </div>
-            <NTextarea v-model="form.description" label="Описание" placeholder="Подробное описание материала, ключевые слова для поиска…" :rows="4" />
-          </div>
-        </NCard>
+    <form class="grid grid-cols-1 gap-6 xl:grid-cols-3" @submit.prevent="submit">
+      <div class="space-y-6 xl:col-span-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Основные сведения</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <FieldGroup>
+              <Field>
+                <FieldLabel for="material-title">
+                  Название <span class="text-destructive">*</span>
+                </FieldLabel>
+                <Input
+                  id="material-title"
+                  v-model="form.title"
+                  placeholder="Например: Кубок за победу в олимпиаде, 1998 г."
+                  required
+                />
+              </Field>
+              <div class="grid gap-6 sm:grid-cols-2">
+                <Field>
+                  <FieldLabel for="material-category">Категория</FieldLabel>
+                  <Select :model-value="form.category" :disabled="isEdit" @update:model-value="setCategory">
+                    <SelectTrigger id="material-category" class="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem v-for="c in categories" :key="c.id" :value="c.id">
+                        <component :is="c.icon" />
+                        {{ c.label }}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field>
+                  <FieldLabel for="material-origin">Время происхождения</FieldLabel>
+                  <DatePicker id="material-origin" v-model="form.origin_date" />
+                  <FieldDescription>Если известно (у фотографий, наград и т.д.)</FieldDescription>
+                </Field>
+              </div>
+              <Field>
+                <FieldLabel for="material-description">Описание</FieldLabel>
+                <Textarea
+                  id="material-description"
+                  v-model="form.description"
+                  placeholder="Подробное описание материала, ключевые слова для поиска…"
+                  :rows="4"
+                />
+              </Field>
+            </FieldGroup>
+          </CardContent>
+        </Card>
 
-        <NCard
-          :title="isEdit && !hasContent ? 'Файлы' : 'Содержимое'"
-          :subtitle="isEdit ? 'Добавьте новые файлы или удалите лишние' : 'Загрузите файлы или создайте текстовый документ'"
-        >
-          <div v-if="!isEdit" class="flex gap-2 mb-4">
-            <button
-              type="button"
-              class="flex-1 border p-3 text-sm font-semibold transition-colors ng-tile-press cursor-pointer flex items-center justify-center gap-2"
-              :class="sourceType === 'file' ? 'border-accent text-ink bg-surface-2' : 'border-line text-muted hover:border-line-strong'"
-              @click="sourceType = 'file'"
-            >
-              <NIcon name="upload" :size="16" /> Файлы
-            </button>
-            <button
-              type="button"
-              class="flex-1 border p-3 text-sm font-semibold transition-colors ng-tile-press cursor-pointer flex items-center justify-center gap-2"
-              :class="sourceType === 'text' ? 'border-accent text-ink bg-surface-2' : 'border-line text-muted hover:border-line-strong'"
-              @click="sourceType = 'text'"
-            >
-              <NIcon name="edit" :size="16" /> Текстовый документ
-            </button>
-          </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>{{ isEdit && !hasContent ? 'Файлы' : 'Содержимое' }}</CardTitle>
+            <CardDescription>
+              {{ isEdit ? 'Добавьте новые файлы или удалите лишние' : 'Загрузите файлы или создайте текстовый документ' }}
+            </CardDescription>
+          </CardHeader>
+          <CardContent class="space-y-4">
+            <Tabs v-if="!isEdit" :model-value="sourceType" @update:model-value="setSourceType">
+              <TabsList class="grid w-full grid-cols-2">
+                <TabsTrigger value="file">
+                  <UploadIcon />
+                  Файлы
+                </TabsTrigger>
+                <TabsTrigger value="text">
+                  <PencilIcon />
+                  Текстовый документ
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
 
-          <template v-if="showFiles">
-            <div
-              class="border-2 border-dashed p-8 text-center transition-colors cursor-pointer"
-              :class="dragOver ? 'border-accent bg-surface-2' : 'border-line hover:border-line-strong'"
-              @click="pickFiles"
-              @dragover.prevent="dragOver = true"
-              @dragleave="dragOver = false"
-              @drop.prevent="onDrop"
-            >
+            <template v-if="showFiles">
+              <button
+                type="button"
+                class="flex w-full flex-col items-center gap-2 rounded-lg border-2 border-dashed p-8 text-center transition-colors outline-none hover:bg-muted/40 focus-visible:ring-3 focus-visible:ring-ring/50"
+                :class="dragOver ? 'border-primary bg-primary/5' : 'border-border'"
+                @click="pickFiles"
+                @dragover.prevent="dragOver = true"
+                @dragleave="dragOver = false"
+                @drop.prevent="onDrop"
+              >
+                <span class="flex size-10 items-center justify-center rounded-lg bg-muted">
+                  <FilePlusIcon class="size-5 text-muted-foreground" />
+                </span>
+                <span class="font-medium">Перетащите файлы сюда или нажмите</span>
+                <span class="text-xs text-muted-foreground">
+                  Можно выбрать сразу несколько: PDF, DOC(X), PPT(X), ODT, ODP, изображения, видео, аудио, HTML, MD
+                </span>
+              </button>
               <input ref="fileInput" type="file" multiple :accept="ACCEPT" class="hidden" @change="onFilesChange" />
-              <NIcon name="upload" :size="32" class="text-faint inline-block" />
-              <div class="font-bold text-ink mt-2">Перетащите файлы сюда или нажмите</div>
-              <div class="text-xs text-muted mt-1">
-                Можно выбрать сразу несколько: PDF, DOC(X), PPT(X), ODT, ODP, изображения, видео, аудио, HTML, MD
-              </div>
-            </div>
 
-            <div v-if="existingFiles.length || pendingFiles.length" class="space-y-2 mt-4">
-              <div
-                v-for="f in existingFiles"
-                :key="f.id"
-                class="flex items-center gap-3 border px-3 py-2"
-                :class="isRemoved(f) ? 'border-line bg-surface opacity-60' : 'border-line bg-surface-2'"
-              >
-                <NIcon :name="fileIcon(fileKind(f.name, f.mime))" :size="18" class="text-accent shrink-0" />
-                <div class="min-w-0 flex-1">
-                  <div class="text-sm font-semibold text-ink break-all" :class="isRemoved(f) ? 'line-through' : ''">
-                    {{ f.name }}
-                  </div>
-                  <div class="text-xs text-muted">
-                    {{ formatBytes(f.size) }}{{ isRemoved(f) ? ' · будет удалён при сохранении' : '' }}
-                  </div>
-                </div>
-                <button
-                  v-if="isRemoved(f)"
-                  type="button"
-                  class="text-muted hover:text-accent transition-colors cursor-pointer shrink-0"
-                  title="Вернуть файл"
-                  @click="restoreExisting(f)"
+              <ItemGroup v-if="existingFiles.length || pendingFiles.length" class="gap-2">
+                <Item
+                  v-for="f in existingFiles"
+                  :key="f.id"
+                  variant="outline"
+                  size="sm"
+                  :class="isRemoved(f) ? 'opacity-60' : ''"
                 >
-                  <NIcon name="refresh" :size="16" />
-                </button>
-                <button
-                  v-else
-                  type="button"
-                  class="text-muted hover:text-danger transition-colors cursor-pointer shrink-0"
-                  title="Удалить файл"
-                  @click="removeExisting(f)"
-                >
-                  <NIcon name="trash" :size="16" />
-                </button>
-              </div>
+                  <ItemMedia variant="icon">
+                    <component :is="fileIcon(fileKind(f.name, f.mime))" class="text-primary" />
+                  </ItemMedia>
+                  <ItemContent class="min-w-0">
+                    <ItemTitle class="break-all" :class="isRemoved(f) ? 'line-through' : ''">{{ f.name }}</ItemTitle>
+                    <ItemDescription>
+                      {{ formatBytes(f.size) }}{{ isRemoved(f) ? ' · будет удалён при сохранении' : '' }}
+                    </ItemDescription>
+                  </ItemContent>
+                  <ItemActions>
+                    <Tooltip>
+                      <TooltipTrigger as-child>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          @click="isRemoved(f) ? restoreExisting(f) : removeExisting(f)"
+                        >
+                          <RotateCcwIcon v-if="isRemoved(f)" />
+                          <Trash2Icon v-else />
+                          <span class="sr-only">{{ isRemoved(f) ? 'Вернуть файл' : 'Удалить файл' }}</span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{{ isRemoved(f) ? 'Вернуть файл' : 'Удалить файл' }}</TooltipContent>
+                    </Tooltip>
+                  </ItemActions>
+                </Item>
 
-              <div
-                v-for="(f, i) in pendingFiles"
-                :key="`new-${i}-${f.name}`"
-                class="flex items-center gap-3 bg-surface-2 border border-line border-l-[3px] border-l-success px-3 py-2"
-              >
-                <NIcon name="checkCircle" :size="18" class="text-success shrink-0" />
-                <div class="min-w-0 flex-1">
-                  <div class="text-sm font-semibold text-ink break-all">{{ f.name }}</div>
-                  <div class="text-xs text-muted">{{ formatBytes(f.size) }} · новый файл</div>
-                </div>
-                <button
-                  type="button"
-                  class="text-muted hover:text-danger transition-colors cursor-pointer shrink-0"
-                  title="Убрать из списка"
-                  @click="removePending(i)"
+                <Item
+                  v-for="(f, i) in pendingFiles"
+                  :key="`new-${i}-${f.name}`"
+                  variant="outline"
+                  size="sm"
+                  class="border-success/40 bg-success/5"
                 >
-                  <NIcon name="close" :size="16" />
-                </button>
-              </div>
-            </div>
-          </template>
+                  <ItemMedia variant="icon">
+                    <component :is="fileIcon(fileKind(f.name, f.type))" class="text-success" />
+                  </ItemMedia>
+                  <ItemContent class="min-w-0">
+                    <ItemTitle class="break-all">{{ f.name }}</ItemTitle>
+                    <ItemDescription>{{ formatBytes(f.size) }} · новый файл</ItemDescription>
+                  </ItemContent>
+                  <ItemActions>
+                    <Tooltip>
+                      <TooltipTrigger as-child>
+                        <Button type="button" variant="ghost" size="icon-sm" @click="removePending(i)">
+                          <XIcon />
+                          <span class="sr-only">Убрать из списка</span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Убрать из списка</TooltipContent>
+                    </Tooltip>
+                  </ItemActions>
+                </Item>
+              </ItemGroup>
+            </template>
 
-          <template v-if="showEditor">
-            <TextEditor v-model:content="content" v-model:format="contentFormat" :class="showFiles ? 'mt-6' : ''" />
-            <p v-if="!isEdit" class="text-xs text-muted mt-2">
-              Текстовые документы сохраняются в базе данных и просматриваются прямо на портале. Они относятся к «Библиотеке».
-            </p>
-          </template>
-        </NCard>
+            <template v-if="showEditor">
+              <TextEditor v-model:content="content" v-model:format="contentFormat" :class="showFiles ? 'mt-2' : ''" />
+              <p v-if="!isEdit" class="text-xs text-muted-foreground">
+                Текстовые документы сохраняются в базе данных и просматриваются прямо на портале. Они относятся к «Библиотеке».
+              </p>
+            </template>
+          </CardContent>
+        </Card>
       </div>
 
       <div class="space-y-6">
-        <NCard title="Физический экземпляр" subtitle="Для учёта оригинала">
-          <div class="space-y-4">
-            <NInput v-model="form.condition" label="Состояние" placeholder="Например: хорошее, требует реставрации" />
-            <NInput v-model="form.location" label="Где находится" placeholder="Например: музей школы, шкаф 3, полка 2" />
-          </div>
-        </NCard>
+        <Card>
+          <CardHeader>
+            <CardTitle>Физический экземпляр</CardTitle>
+            <CardDescription>Для учёта оригинала</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <FieldGroup>
+              <Field>
+                <FieldLabel for="material-condition">Состояние</FieldLabel>
+                <Input
+                  id="material-condition"
+                  v-model="form.condition"
+                  placeholder="Например: хорошее, требует реставрации"
+                />
+              </Field>
+              <Field>
+                <FieldLabel for="material-location">Где находится</FieldLabel>
+                <Input
+                  id="material-location"
+                  v-model="form.location"
+                  placeholder="Например: музей школы, шкаф 3, полка 2"
+                />
+              </Field>
+            </FieldGroup>
+          </CardContent>
+        </Card>
 
-        <NCard title="Сохранение">
-          <p class="text-xs text-muted mb-4">
-            После сохранения можно будет сгенерировать QR-код со ссылкой на карточку и наклеить его на физический экземпляр.
-          </p>
-          <div v-if="isEdit && (pendingFiles.length || removedIds.length)" class="text-xs text-muted mb-4 space-y-1">
-            <div v-if="pendingFiles.length">Будет загружено файлов: {{ pendingFiles.length }}</div>
-            <div v-if="removedIds.length">Будет удалено файлов: {{ removedIds.length }}</div>
-          </div>
-          <NButton type="submit" block size="lg" :loading="saving" icon="check">
-            {{ isEdit ? 'Сохранить изменения' : 'Добавить в архив' }}
-          </NButton>
-        </NCard>
+        <Card class="xl:sticky xl:top-20">
+          <CardHeader>
+            <CardTitle>Сохранение</CardTitle>
+            <CardDescription>
+              После сохранения можно будет сгенерировать QR-код со ссылкой на карточку и наклеить его на физический
+              экземпляр.
+            </CardDescription>
+          </CardHeader>
+          <CardContent class="space-y-4">
+            <div
+              v-if="isEdit && (pendingFiles.length || removedIds.length)"
+              class="space-y-1 text-xs text-muted-foreground"
+            >
+              <p v-if="pendingFiles.length">Будет загружено файлов: {{ pendingFiles.length }}</p>
+              <p v-if="removedIds.length">Будет удалено файлов: {{ removedIds.length }}</p>
+            </div>
+            <Button type="submit" size="lg" class="w-full" :disabled="saving">
+              <Spinner v-if="saving" />
+              <CheckIcon v-else />
+              {{ isEdit ? 'Сохранить изменения' : 'Добавить в архив' }}
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </form>
   </div>
-  <div v-else class="text-center text-muted py-16">Загрузка…</div>
+
+  <div v-else class="space-y-6">
+    <div class="space-y-2">
+      <Skeleton class="h-8 w-72 max-w-full" />
+      <Skeleton class="h-4 w-56" />
+    </div>
+    <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">
+      <Skeleton class="h-96 rounded-xl xl:col-span-2" />
+      <Skeleton class="h-64 rounded-xl" />
+    </div>
+  </div>
 </template>

@@ -1,28 +1,37 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { theme, toggleTheme, accent, setAccent, ACCENTS } from '@/lib/theme'
-import NPageHeader from '@/components/ui/NPageHeader.vue'
-import NCard from '@/components/ui/NCard.vue'
-import NTabs from '@/components/ui/NTabs.vue'
-import NIcon from '@/components/ui/NIcon.vue'
-import NAvatar from '@/components/ui/NAvatar.vue'
-import NBadge from '@/components/ui/NBadge.vue'
-import NInput from '@/components/ui/NInput.vue'
-import NButton from '@/components/ui/NButton.vue'
+import { CheckIcon, LockIcon, MoonIcon, PaletteIcon, SunIcon, UserIcon } from '@lucide/vue'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import { Spinner } from '@/components/ui/spinner'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import PageHeader from '@/components/PageHeader.vue'
+import StatusBadge from '@/components/StatusBadge.vue'
+import { theme, setTheme, accent, setAccent, ACCENTS } from '@/lib/theme'
+import type { Theme } from '@/lib/theme'
 import { api, errorMessage } from '@/lib/api'
 import { notify } from '@/lib/notify'
 import { user } from '@/lib/auth'
-import { ROLE_LABELS, formatDate } from '@/lib/catalog'
+import { ROLE_LABELS, ROLE_TONES, formatDate, initials } from '@/lib/catalog'
+import { cn } from '@/lib/utils'
 import type { UserRole } from '@/lib/types'
 
 const tab = ref('appearance')
-const tabs = [
-  { value: 'appearance', label: 'Оформление', icon: 'palette' },
-  { value: 'account', label: 'Аккаунт', icon: 'user' },
+
+const themes: { id: Theme; label: string; icon: typeof SunIcon }[] = [
+  { id: 'light', label: 'Светлая', icon: SunIcon },
+  { id: 'dark', label: 'Тёмная', icon: MoonIcon },
 ]
 
 const pw = ref({ current: '', next: '', repeat: '' })
 const pwSaving = ref(false)
+
+function setTab(v: unknown) {
+  if (typeof v === 'string') tab.value = v
+}
 
 async function changePassword() {
   if (!pw.value.current) {
@@ -61,96 +70,165 @@ const roleHints: Record<UserRole, string> = {
 
 <template>
   <div>
-    <NPageHeader title="Настройки" />
+    <PageHeader title="Настройки" description="Оформление интерфейса и учётная запись" />
 
-    <NTabs v-model="tab" :tabs="tabs" class="mb-6" />
+    <Tabs :model-value="tab" @update:model-value="setTab">
+      <TabsList class="mb-4">
+        <TabsTrigger value="appearance">
+          <PaletteIcon />
+          Оформление
+        </TabsTrigger>
+        <TabsTrigger value="account">
+          <UserIcon />
+          Аккаунт
+        </TabsTrigger>
+      </TabsList>
 
-    <div v-if="tab === 'appearance'" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <NCard title="Тема">
-        <div class="grid grid-cols-2 gap-3">
-          <button
-            class="border p-4 text-left transition-colors ng-tile-press cursor-pointer"
-            :class="theme === 'dark' ? 'border-accent' : 'border-line hover:border-line-strong'"
-            @click="theme !== 'dark' && toggleTheme()"
-          >
-            <div class="flex items-center justify-between mb-3">
-              <NIcon name="moon" :size="20" class="text-accent" />
-              <NIcon v-if="theme === 'dark'" name="checkCircle" :size="18" class="text-accent" />
+      <TabsContent value="appearance" class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Тема</CardTitle>
+            <CardDescription>Светлое или тёмное оформление</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div class="grid grid-cols-2 gap-3" role="radiogroup" aria-label="Тема">
+              <button
+                v-for="t in themes"
+                :key="t.id"
+                type="button"
+                role="radio"
+                :aria-checked="theme === t.id"
+                :class="
+                  cn(
+                    'relative flex flex-col items-start gap-3 rounded-lg border p-4 text-left text-sm font-medium transition-colors outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50',
+                    theme === t.id && 'border-primary ring-1 ring-primary',
+                  )
+                "
+                @click="setTheme(t.id)"
+              >
+                <component :is="t.icon" class="size-5 text-muted-foreground" />
+                {{ t.label }}
+                <CheckIcon v-if="theme === t.id" class="absolute top-3 right-3 size-4 text-primary" />
+              </button>
             </div>
-            <div class="font-bold text-ink text-sm">Тёмная</div>
-          </button>
-          <button
-            class="border p-4 text-left transition-colors ng-tile-press cursor-pointer"
-            :class="theme === 'light' ? 'border-accent' : 'border-line hover:border-line-strong'"
-            @click="theme !== 'light' && toggleTheme()"
-          >
-            <div class="flex items-center justify-between mb-3">
-              <NIcon name="sun" :size="20" class="text-accent" />
-              <NIcon v-if="theme === 'light'" name="checkCircle" :size="18" class="text-accent" />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Акцентный цвет</CardTitle>
+            <CardDescription>Цвет кнопок, ссылок и выделений</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div class="grid grid-cols-3 gap-3" role="radiogroup" aria-label="Акцентный цвет">
+              <button
+                v-for="a in ACCENTS"
+                :key="a.id"
+                type="button"
+                role="radio"
+                :aria-checked="accent === a.id"
+                :class="
+                  cn(
+                    'flex items-center gap-2.5 rounded-lg border p-3 text-sm font-medium transition-colors outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50',
+                    accent === a.id && 'border-primary ring-1 ring-primary',
+                  )
+                "
+                @click="setAccent(a.id)"
+              >
+                <span
+                  class="flex size-5 shrink-0 items-center justify-center rounded-full"
+                  :style="{ background: a.hex }"
+                >
+                  <CheckIcon v-if="accent === a.id" class="size-3 text-white" :stroke-width="3" />
+                </span>
+                {{ a.label }}
+              </button>
             </div>
-            <div class="font-bold text-ink text-sm">Светлая</div>
-          </button>
-        </div>
-      </NCard>
+          </CardContent>
+        </Card>
+      </TabsContent>
 
-      <NCard title="Акцентный цвет">
-        <div class="grid grid-cols-3 gap-3">
-          <button
-            v-for="a in ACCENTS"
-            :key="a.id"
-            class="relative h-16 border-2 transition-all ng-tile-press cursor-pointer flex items-end p-2"
-            :class="accent === a.id ? 'border-ink' : 'border-transparent hover:border-line-strong'"
-            :style="{ background: a.hex }"
-            @click="setAccent(a.id)"
-          >
-            <span class="text-[11px] font-bold text-white mix-blend-difference">{{ a.label }}</span>
-            <NIcon v-if="accent === a.id" name="check" :size="18" :stroke="3" class="absolute top-2 right-2 text-white mix-blend-difference" />
-          </button>
-        </div>
-      </NCard>
-    </div>
+      <TabsContent value="account" class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <Card>
+          <CardContent class="flex flex-col items-center gap-4 py-2 text-center">
+            <Avatar class="size-20">
+              <AvatarImage src="/ProfileIcon.svg" :alt="user?.full_name" />
+              <AvatarFallback class="text-xl">{{ initials(user?.full_name) }}</AvatarFallback>
+            </Avatar>
+            <div class="space-y-1">
+              <div class="font-semibold">{{ user?.full_name }}</div>
+              <div class="text-muted-foreground">@{{ user?.username }}</div>
+            </div>
+            <StatusBadge v-if="user" :tone="ROLE_TONES[user.role]">{{ ROLE_LABELS[user.role] }}</StatusBadge>
+          </CardContent>
+        </Card>
 
-    <div v-else class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <NCard title="Профиль" class="lg:col-span-1">
-        <div class="flex flex-col items-center text-center gap-4 py-2">
-          <NAvatar :name="user?.full_name || ''" src="/ProfileIcon.svg" :size="88" />
-          <div>
-            <div class="font-bold text-ink">{{ user?.full_name }}</div>
-            <div class="text-xs text-muted mt-0.5">@{{ user?.username }}</div>
-            <NBadge variant="accent" class="mt-2">{{ user ? ROLE_LABELS[user.role] : '' }}</NBadge>
-          </div>
-        </div>
-      </NCard>
+        <Card class="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Учётная запись</CardTitle>
+            <CardDescription>{{ user ? roleHints[user.role] : '' }}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <dl class="divide-y">
+              <div class="flex justify-between gap-4 py-2.5 first:pt-0">
+                <dt class="text-muted-foreground">Логин</dt>
+                <dd class="font-medium">{{ user?.username }}</dd>
+              </div>
+              <div class="flex justify-between gap-4 py-2.5">
+                <dt class="text-muted-foreground">Роль</dt>
+                <dd class="font-medium">{{ user ? ROLE_LABELS[user.role] : '' }}</dd>
+              </div>
+              <div class="flex justify-between gap-4 py-2.5 last:pb-0">
+                <dt class="text-muted-foreground">В системе с</dt>
+                <dd>{{ formatDate(user?.created_at) }}</dd>
+              </div>
+            </dl>
+          </CardContent>
+        </Card>
 
-      <NCard title="Учётная запись" class="lg:col-span-2" accent>
-        <dl class="divide-y divide-line text-sm">
-          <div class="flex justify-between gap-4 py-2.5">
-            <dt class="text-muted">Логин</dt>
-            <dd class="text-ink font-semibold">{{ user?.username }}</dd>
-          </div>
-          <div class="flex justify-between gap-4 py-2.5">
-            <dt class="text-muted">Роль</dt>
-            <dd class="text-ink font-semibold">{{ user ? ROLE_LABELS[user.role] : '' }}</dd>
-          </div>
-          <div class="flex justify-between gap-4 py-2.5">
-            <dt class="text-muted">В системе с</dt>
-            <dd class="text-ink">{{ formatDate(user?.created_at) }}</dd>
-          </div>
-        </dl>
-        <p class="text-xs text-muted mt-4">{{ user ? roleHints[user.role] : '' }}</p>
-      </NCard>
-
-      <NCard title="Смена пароля" class="lg:col-span-3">
-        <form class="grid grid-cols-1 sm:grid-cols-3 gap-4" @submit.prevent="changePassword">
-          <NInput v-model="pw.current" label="Текущий пароль" type="password" placeholder="••••••••" icon="lock" />
-          <NInput v-model="pw.next" label="Новый пароль" type="password" placeholder="••••••••" icon="lock" hint="Минимум 6 символов" />
-          <NInput v-model="pw.repeat" label="Повторите новый пароль" type="password" placeholder="••••••••" icon="lock" />
-          <button type="submit" class="hidden" />
-        </form>
-        <template #footer>
-          <NButton icon="lock" :loading="pwSaving" @click="changePassword">Обновить пароль</NButton>
-        </template>
-      </NCard>
-    </div>
+        <Card class="lg:col-span-3">
+          <CardHeader>
+            <CardTitle>Смена пароля</CardTitle>
+            <CardDescription>Для подтверждения понадобится текущий пароль</CardDescription>
+          </CardHeader>
+          <form @submit.prevent="changePassword">
+            <CardContent class="grid grid-cols-1 gap-6 sm:grid-cols-3">
+              <Field>
+                <FieldLabel for="pw-current">Текущий пароль</FieldLabel>
+                <Input
+                  id="pw-current"
+                  v-model="pw.current"
+                  type="password"
+                  placeholder="••••••••"
+                  autocomplete="current-password"
+                />
+              </Field>
+              <Field>
+                <FieldLabel for="pw-next">Новый пароль</FieldLabel>
+                <Input id="pw-next" v-model="pw.next" type="password" placeholder="••••••••" autocomplete="new-password" />
+                <FieldDescription>Минимум 6 символов</FieldDescription>
+              </Field>
+              <Field>
+                <FieldLabel for="pw-repeat">Повторите новый пароль</FieldLabel>
+                <Input
+                  id="pw-repeat"
+                  v-model="pw.repeat"
+                  type="password"
+                  placeholder="••••••••"
+                  autocomplete="new-password"
+                />
+              </Field>
+            </CardContent>
+            <CardFooter class="mt-6 border-t pt-6">
+              <Button type="submit" :disabled="pwSaving">
+                <Spinner v-if="pwSaving" />
+                <LockIcon v-else />
+                Обновить пароль
+              </Button>
+            </CardFooter>
+          </form>
+        </Card>
+      </TabsContent>
+    </Tabs>
   </div>
 </template>

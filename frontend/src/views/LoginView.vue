@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import NInput from '@/components/ui/NInput.vue'
-import NButton from '@/components/ui/NButton.vue'
-import NIcon from '@/components/ui/NIcon.vue'
+import { ArchiveIcon } from '@lucide/vue'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import { Spinner } from '@/components/ui/spinner'
 import { notify } from '@/lib/notify'
 import { errorMessage } from '@/lib/api'
 import { login } from '@/lib/auth'
@@ -33,41 +36,57 @@ async function submit() {
 </script>
 
 <template>
-  <div class="min-h-screen grid lg:grid-cols-2 bg-bg">
-    <div class="hidden lg:flex flex-col justify-between p-12 bg-accent text-on-accent relative overflow-hidden">
-      <div class="absolute -right-16 -top-16 w-72 h-72 border-[24px] border-on-accent/10" />
-      <div class="absolute right-20 bottom-24 w-40 h-40 bg-on-accent/10" />
-      <div class="flex items-center gap-2.5 relative">
-        <span class="w-9 h-9 bg-on-accent flex items-center justify-center">
-          <NIcon name="archive" :size="20" class="text-accent" />
+  <div class="flex min-h-svh flex-col items-center justify-center gap-6 bg-muted p-6 md:p-10">
+    <div class="flex w-full max-w-sm flex-col gap-6">
+      <RouterLink to="/" class="flex items-center gap-2 self-center font-semibold">
+        <span class="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
+          <ArchiveIcon class="size-4" />
         </span>
-        <span class="text-xl font-extrabold tracking-normal">Архивли</span>
-      </div>
-      <div class="relative">
-        <h1 class="text-4xl font-extrabold leading-tight tracking-normal">Добро<br />пожаловать</h1>
-      </div>
-    </div>
+        Архивли
+      </RouterLink>
 
-    <div class="flex items-center justify-center p-6 sm:p-12">
-      <div class="w-full max-w-sm ng-enter">
-        <div class="lg:hidden flex items-center gap-2.5 mb-8">
-          <span class="w-8 h-8 bg-accent flex items-center justify-center">
-            <NIcon name="archive" :size="17" class="text-on-accent" />
-          </span>
-          <span class="font-extrabold text-ink">Архив<span class="text-accent">ли</span></span>
-        </div>
+      <Card>
+        <CardHeader class="text-center">
+          <CardTitle class="text-xl">С возвращением</CardTitle>
+          <CardDescription>Войдите, чтобы продолжить работу с архивом</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form @submit.prevent="submit">
+            <FieldGroup>
+              <Field>
+                <FieldLabel for="login-username">Логин</FieldLabel>
+                <Input
+                  id="login-username"
+                  v-model="username"
+                  placeholder="Имя пользователя"
+                  autocomplete="username"
+                  autofocus
+                />
+              </Field>
+              <Field>
+                <FieldLabel for="login-password">Пароль</FieldLabel>
+                <Input
+                  id="login-password"
+                  v-model="password"
+                  type="password"
+                  placeholder="••••••••"
+                  autocomplete="current-password"
+                />
+              </Field>
+              <Field>
+                <Button type="submit" :disabled="loading">
+                  <Spinner v-if="loading" />
+                  Войти
+                </Button>
+              </Field>
+            </FieldGroup>
+          </form>
+        </CardContent>
+      </Card>
 
-        <div class="w-10 h-1 bg-accent mb-4" />
-        <h2 class="text-2xl font-extrabold text-ink tracking-normal">С возвращением</h2>
-        <p class="text-muted text-sm mt-1 mb-8">Войдите, чтобы продолжить работу с архивом</p>
-
-        <form class="space-y-4" @submit.prevent="submit">
-          <NInput v-model="username" label="Логин" placeholder="Имя пользователя" icon="user" />
-          <NInput v-model="password" label="Пароль" type="password" placeholder="••••••••" icon="lock" />
-          <NButton type="submit" block size="lg" :loading="loading" icon-right="arrowRight">Войти</NButton>
-        </form>
-
-      </div>
+      <p class="text-center text-xs text-muted-foreground">
+        Цифровой архив ЦСУАМ. Доступ выдаёт завуч.
+      </p>
     </div>
   </div>
 </template>

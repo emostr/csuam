@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import NPageHeader from '@/components/ui/NPageHeader.vue'
-import NButton from '@/components/ui/NButton.vue'
-import NInput from '@/components/ui/NInput.vue'
-import NDateInput from '@/components/ui/NDateInput.vue'
-import MaterialCard from '@/components/MaterialCard.vue'
+import { PlusIcon, SearchIcon } from '@lucide/vue'
+import { Button } from '@/components/ui/button'
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
+import PageHeader from '@/components/PageHeader.vue'
+import DatePicker from '@/components/DatePicker.vue'
+import MaterialGrid from '@/components/MaterialGrid.vue'
 import { api, errorMessage } from '@/lib/api'
 import { notify } from '@/lib/notify'
 import { isHeadTeacher } from '@/lib/auth'
@@ -17,13 +18,6 @@ const router = useRouter()
 
 const category = computed<MaterialCategory>(() => route.meta.category ?? 'photos')
 const meta = computed(() => categoryMeta(category.value))
-const subtitles: Record<MaterialCategory, string> = {
-  photos: '',
-  videos: '',
-  library: '',
-  awards: '',
-  documents: '',
-}
 
 const canAdd = computed(() => category.value !== 'documents' || isHeadTeacher.value)
 
@@ -54,30 +48,37 @@ onMounted(load)
 
 <template>
   <div>
-    <NPageHeader :title="meta.label" :subtitle="subtitles[category] || ''">
+    <PageHeader :title="meta.label">
       <template #actions>
-        <NButton v-if="canAdd" icon="plus" @click="router.push({ path: '/add', query: { category } })">
+        <Button v-if="canAdd" @click="router.push({ path: '/add', query: { category } })">
+          <PlusIcon />
           Добавить
-        </NButton>
+        </Button>
       </template>
-    </NPageHeader>
+    </PageHeader>
 
-    <div class="bg-surface border border-line p-4 mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
-      <form class="lg:col-span-2" @submit.prevent="load">
-        <NInput v-model="q" label="Поиск" placeholder="Ключевые слова…" icon="search" @keyup.enter="load" />
+    <div class="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_repeat(2,minmax(0,1fr))]">
+      <form class="sm:col-span-2 lg:col-span-1" role="search" @submit.prevent="load">
+        <InputGroup>
+          <InputGroupAddon>
+            <SearchIcon />
+          </InputGroupAddon>
+          <InputGroupInput v-model="q" placeholder="Поиск по названию и описанию…" aria-label="Поиск" />
+        </InputGroup>
       </form>
-      <NDateInput v-model="from" label="Происхождение с" />
-      <NDateInput v-model="to" label="Происхождение по" />
+      <DatePicker v-model="from" placeholder="Происхождение с" />
+      <DatePicker v-model="to" placeholder="Происхождение по" />
     </div>
 
-    <div v-if="loading" class="text-center text-muted py-16">Загрузка…</div>
-    <div v-else-if="!materials.length" class="bg-surface border border-line py-16 text-center text-muted">
-      {{ category === 'documents' && !isHeadTeacher
-        ? 'Нет доступных документов. Доступ к ним выдаёт завуч.'
-        : 'В этой категории пока нет материалов.' }}
-    </div>
-    <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      <MaterialCard v-for="m in materials" :key="m.id" :material="m" />
-    </div>
+    <MaterialGrid
+      :materials="materials"
+      :loading="loading"
+      :empty-title="category === 'documents' && !isHeadTeacher ? 'Нет доступных документов' : 'Пока пусто'"
+      :empty-text="
+        category === 'documents' && !isHeadTeacher
+          ? 'Доступ к документам выдаёт завуч.'
+          : 'В этой категории пока нет материалов.'
+      "
+    />
   </div>
 </template>

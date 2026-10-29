@@ -1,21 +1,40 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import NPageHeader from '@/components/ui/NPageHeader.vue'
-import NButton from '@/components/ui/NButton.vue'
-import NTable from '@/components/ui/NTable.vue'
-import NBadge from '@/components/ui/NBadge.vue'
-import NModal from '@/components/ui/NModal.vue'
-import NInput from '@/components/ui/NInput.vue'
-import NSelect from '@/components/ui/NSelect.vue'
-import NAvatar from '@/components/ui/NAvatar.vue'
-import NAlert from '@/components/ui/NAlert.vue'
-import NIcon from '@/components/ui/NIcon.vue'
+import { EllipsisIcon, KeyRoundIcon, ShieldAlertIcon, Trash2Icon, UserPlusIcon } from '@lucide/vue'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Spinner } from '@/components/ui/spinner'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import PageHeader from '@/components/PageHeader.vue'
+import StatusBadge from '@/components/StatusBadge.vue'
 import { api, errorMessage } from '@/lib/api'
 import { notify } from '@/lib/notify'
 import { user, isHeadTeacher } from '@/lib/auth'
-import { ROLE_LABELS, formatDate } from '@/lib/catalog'
+import { ROLE_LABELS, ROLE_TONES, formatDate, initials } from '@/lib/catalog'
 import type { User, UserRole } from '@/lib/types'
-import type { SelectOption, TableColumn } from '@/lib/ui'
 
 interface NewUser {
   full_name: string
@@ -31,24 +50,11 @@ const createOpen = ref(false)
 const newUser = ref<NewUser>({ full_name: '', username: '', password: '', role: 'teacher' })
 const saving = ref(false)
 
-const columns: TableColumn[] = [
-  { key: 'full_name', label: 'Пользователь' },
-  { key: 'username', label: 'Логин' },
-  { key: 'role', label: 'Роль' },
-  { key: 'created_at', label: 'В системе с' },
-  { key: 'actions', label: '', align: 'right' },
-]
+const roles: UserRole[] = ['teacher', 'librarian', 'head_teacher']
 
-const roleOptions: SelectOption[] = [
-  { value: 'teacher', label: 'Учитель' },
-  { value: 'librarian', label: 'Библиотекарь' },
-  { value: 'head_teacher', label: 'Завуч' },
-]
-
-const roleVariants: Record<UserRole, string> = {
-  head_teacher: 'accent',
-  librarian: 'info',
-  teacher: 'neutral',
+function setRole(v: unknown) {
+  const r = roles.find((x) => x === v)
+  if (r) newUser.value.role = r
 }
 
 async function load() {
@@ -135,72 +141,147 @@ async function removeUser(row: User) {
 
 <template>
   <div>
-    <NPageHeader title="Пользователи">
+    <PageHeader title="Пользователи" description="Учётные записи сотрудников школы">
       <template #actions>
-        <NButton v-if="isHeadTeacher" icon="userPlus" @click="openCreate">Создать пользователя</NButton>
+        <Button v-if="isHeadTeacher" @click="openCreate">
+          <UserPlusIcon />
+          Создать пользователя
+        </Button>
       </template>
-    </NPageHeader>
+    </PageHeader>
 
-    <NAlert v-if="!isHeadTeacher" variant="warning" title="Недостаточно прав">
-      Управление пользователями доступно только завучу
-    </NAlert>
+    <Alert v-if="!isHeadTeacher">
+      <ShieldAlertIcon />
+      <AlertTitle>Недостаточно прав</AlertTitle>
+      <AlertDescription>Управление пользователями доступно только завучу</AlertDescription>
+    </Alert>
 
     <template v-else>
-      <div v-if="loading" class="text-center text-muted py-16">Загрузка…</div>
-      <NTable v-else :columns="columns" :rows="users">
-        <template #full_name="{ row }">
-          <div class="flex items-center gap-3">
-            <NAvatar :name="row.full_name" src="/ProfileIcon.svg" :size="34" />
-            <div>
-              <div class="font-semibold text-ink">{{ row.full_name }}</div>
-              <div v-if="row.id === user?.id" class="text-[11px] text-accent font-semibold">Это Вы</div>
-            </div>
-          </div>
-        </template>
-        <template #username="{ row }">
-          <span class="text-muted">@{{ row.username }}</span>
-        </template>
-        <template #role="{ row }">
-          <NBadge :variant="roleVariants[row.role]" dot>{{ ROLE_LABELS[row.role] }}</NBadge>
-        </template>
-        <template #created_at="{ row }">
-          <span class="text-muted">{{ formatDate(row.created_at) }}</span>
-        </template>
-        <template #actions="{ row }">
-          <div class="flex items-center justify-end gap-1">
-            <button
-              class="h-8 w-8 flex items-center justify-center text-muted hover:text-ink hover:bg-surface-2 transition-colors cursor-pointer"
-              title="Сменить пароль"
-              @click="resetPassword(row)"
-            >
-              <NIcon name="lock" :size="16" />
-            </button>
-            <button
-              v-if="row.id !== user?.id"
-              class="h-8 w-8 flex items-center justify-center text-muted hover:text-danger hover:bg-surface-2 transition-colors cursor-pointer"
-              title="Удалить"
-              @click="removeUser(row)"
-            >
-              <NIcon name="trash" :size="16" />
-            </button>
-          </div>
-        </template>
-      </NTable>
+      <Card class="py-0">
+        <Table>
+          <TableHeader>
+            <TableRow class="hover:bg-transparent">
+              <TableHead class="pl-4">Пользователь</TableHead>
+              <TableHead>Логин</TableHead>
+              <TableHead>Роль</TableHead>
+              <TableHead>В системе с</TableHead>
+              <TableHead class="w-12 pr-4"><span class="sr-only">Действия</span></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <template v-if="loading">
+              <TableRow v-for="i in 4" :key="i">
+                <TableCell class="pl-4">
+                  <div class="flex items-center gap-3">
+                    <Skeleton class="size-8 rounded-full" />
+                    <Skeleton class="h-4 w-40" />
+                  </div>
+                </TableCell>
+                <TableCell><Skeleton class="h-4 w-24" /></TableCell>
+                <TableCell><Skeleton class="h-5 w-20 rounded-full" /></TableCell>
+                <TableCell><Skeleton class="h-4 w-28" /></TableCell>
+                <TableCell class="pr-4" />
+              </TableRow>
+            </template>
+            <TableRow v-for="row in users" v-else :key="row.id">
+              <TableCell class="pl-4">
+                <div class="flex items-center gap-3">
+                  <Avatar class="size-8">
+                    <AvatarImage src="/ProfileIcon.svg" :alt="row.full_name" />
+                    <AvatarFallback>{{ initials(row.full_name) }}</AvatarFallback>
+                  </Avatar>
+                  <span class="font-medium">{{ row.full_name }}</span>
+                  <Badge v-if="row.id === user?.id" variant="secondary">Это вы</Badge>
+                </div>
+              </TableCell>
+              <TableCell class="text-muted-foreground">@{{ row.username }}</TableCell>
+              <TableCell>
+                <StatusBadge :tone="ROLE_TONES[row.role]">{{ ROLE_LABELS[row.role] }}</StatusBadge>
+              </TableCell>
+              <TableCell class="text-muted-foreground">{{ formatDate(row.created_at) }}</TableCell>
+              <TableCell class="pr-4 text-right">
+                <DropdownMenu>
+                  <DropdownMenuTrigger as-child>
+                    <Button variant="ghost" size="icon-sm">
+                      <EllipsisIcon />
+                      <span class="sr-only">Действия</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" class="w-48">
+                    <DropdownMenuItem @select="resetPassword(row)">
+                      <KeyRoundIcon />
+                      Сменить пароль
+                    </DropdownMenuItem>
+                    <template v-if="row.id !== user?.id">
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem variant="destructive" @select="removeUser(row)">
+                        <Trash2Icon />
+                        Удалить
+                      </DropdownMenuItem>
+                    </template>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </TableCell>
+            </TableRow>
+            <TableRow v-if="!loading && !users.length">
+              <TableCell colspan="5" class="h-24 text-center text-muted-foreground">Нет данных</TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </Card>
 
-      <NModal v-model="createOpen" title="Новый пользователь" subtitle="Учётная запись сотрудника школы">
-        <div class="space-y-4">
-          <NInput v-model="newUser.full_name" label="ФИО" placeholder="Иванова Мария Петровна" icon="user" />
-          <div class="grid sm:grid-cols-2 gap-4">
-            <NInput v-model="newUser.username" label="Логин" placeholder="m.ivanova" />
-            <NInput v-model="newUser.password" label="Пароль" type="password" placeholder="Минимум 6 символов" icon="lock" />
-          </div>
-          <NSelect v-model="newUser.role" label="Роль" :options="roleOptions" />
-        </div>
-        <template #footer="{ close }">
-          <NButton variant="ghost" @click="close">Отмена</NButton>
-          <NButton :loading="saving" icon="check" @click="createUser">Создать</NButton>
-        </template>
-      </NModal>
+      <Dialog v-model:open="createOpen">
+        <DialogContent>
+          <form class="grid gap-6" @submit.prevent="createUser">
+            <DialogHeader>
+              <DialogTitle>Новый пользователь</DialogTitle>
+              <DialogDescription>Учётная запись сотрудника школы</DialogDescription>
+            </DialogHeader>
+            <FieldGroup>
+              <Field>
+                <FieldLabel for="new-user-name">ФИО</FieldLabel>
+                <Input id="new-user-name" v-model="newUser.full_name" placeholder="Иванова Мария Петровна" />
+              </Field>
+              <div class="grid gap-6 sm:grid-cols-2">
+                <Field>
+                  <FieldLabel for="new-user-login">Логин</FieldLabel>
+                  <Input id="new-user-login" v-model="newUser.username" placeholder="m.ivanova" autocomplete="off" />
+                </Field>
+                <Field>
+                  <FieldLabel for="new-user-password">Пароль</FieldLabel>
+                  <Input
+                    id="new-user-password"
+                    v-model="newUser.password"
+                    type="password"
+                    placeholder="Минимум 6 символов"
+                    autocomplete="new-password"
+                  />
+                </Field>
+              </div>
+              <Field>
+                <FieldLabel for="new-user-role">Роль</FieldLabel>
+                <Select :model-value="newUser.role" @update:model-value="setRole">
+                  <SelectTrigger id="new-user-role" class="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem v-for="r in roles" :key="r" :value="r">{{ ROLE_LABELS[r] }}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+            </FieldGroup>
+            <DialogFooter>
+              <DialogClose as-child>
+                <Button type="button" variant="outline">Отмена</Button>
+              </DialogClose>
+              <Button type="submit" :disabled="saving">
+                <Spinner v-if="saving" />
+                Создать
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </template>
   </div>
 </template>

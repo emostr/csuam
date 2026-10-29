@@ -1,3 +1,5 @@
+import { CodeIcon, FileTextIcon, FilmIcon, ImageIcon, MusicIcon } from '@lucide/vue'
+import type { LucideIcon } from '@lucide/vue'
 import type { MaterialFile } from './types'
 
 export type FileKind = 'image' | 'video' | 'audio' | 'pdf' | 'html' | 'markdown' | 'other'
@@ -25,19 +27,19 @@ export function fileKind(name: string, mime: string): FileKind {
   return 'other'
 }
 
-export function fileIcon(kind: FileKind): string {
+export function fileIcon(kind: FileKind): LucideIcon {
   switch (kind) {
     case 'image':
-      return 'image'
+      return ImageIcon
     case 'video':
-      return 'film'
+      return FilmIcon
     case 'audio':
-      return 'music'
+      return MusicIcon
     case 'markdown':
     case 'html':
-      return 'code'
+      return CodeIcon
     default:
-      return 'fileText'
+      return FileTextIcon
   }
 }
 

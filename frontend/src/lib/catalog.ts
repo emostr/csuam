@@ -1,22 +1,26 @@
+import { AwardIcon, BookOpenIcon, FileTextIcon, FilmIcon, ImageIcon, PackageIcon } from '@lucide/vue'
+import type { LucideIcon } from '@lucide/vue'
 import type { Loan, MaterialCategory, MaterialStatus, UserRole } from './types'
+
+export type Tone = 'neutral' | 'primary' | 'success' | 'warning' | 'danger' | 'info'
 
 export interface CategoryMeta {
   id: MaterialCategory
   label: string
-  icon: string
+  icon: LucideIcon
   route: string | null
 }
 
 export const CATEGORIES: CategoryMeta[] = [
-  { id: 'photos', label: 'Фотографии', icon: 'image', route: '/photos' },
-  { id: 'videos', label: 'Видео', icon: 'film', route: '/videos' },
-  { id: 'library', label: 'Библиотека', icon: 'book', route: '/library' },
-  { id: 'awards', label: 'Награды', icon: 'award', route: '/awards' },
-  { id: 'documents', label: 'Документы', icon: 'fileText', route: null },
+  { id: 'photos', label: 'Фотографии', icon: ImageIcon, route: '/photos' },
+  { id: 'videos', label: 'Видео', icon: FilmIcon, route: '/videos' },
+  { id: 'library', label: 'Библиотека', icon: BookOpenIcon, route: '/library' },
+  { id: 'awards', label: 'Награды', icon: AwardIcon, route: '/awards' },
+  { id: 'documents', label: 'Документы', icon: FileTextIcon, route: null },
 ]
 
 export function categoryMeta(id: MaterialCategory): CategoryMeta {
-  return CATEGORIES.find((c) => c.id === id) || { id, label: id, icon: 'box', route: null }
+  return CATEGORIES.find((c) => c.id === id) || { id, label: id, icon: PackageIcon, route: null }
 }
 
 export const ROLE_LABELS: Record<UserRole, string> = {
@@ -25,13 +29,19 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   head_teacher: 'Завуч',
 }
 
+export const ROLE_TONES: Record<UserRole, Tone> = {
+  head_teacher: 'primary',
+  librarian: 'info',
+  teacher: 'neutral',
+}
+
 export const STATUS_LABELS: Record<MaterialStatus, string> = {
   pending: 'На модерации',
   approved: 'Опубликован',
   rejected: 'Отклонён',
 }
 
-export const STATUS_VARIANTS: Record<MaterialStatus, string> = {
+export const STATUS_TONES: Record<MaterialStatus, Tone> = {
   pending: 'warning',
   approved: 'success',
   rejected: 'danger',
@@ -71,4 +81,13 @@ export function isOverdue(loan: Loan): boolean {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   return due < today
+}
+
+export function initials(name: string | null | undefined): string {
+  return (name ?? '')
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? '')
+    .join('')
 }
